@@ -1,0 +1,16 @@
+[project]
+name = "aurora-salon-api"
+version = "2.0.0"
+description = "Akıllı salon randevu sistemi — FastAPI backend"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    "ignore::DeprecationWarning:starlette.*",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

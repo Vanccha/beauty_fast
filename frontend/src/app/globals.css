@@ -1,0 +1,175 @@
+@import 'tailwindcss';
+
+/*
+ * =====================================================================
+ * TASARIM SİSTEMİ — mobile-first, dokunmatik dostu
+ * =====================================================================
+ *
+ * Kurallar:
+ *  - Tüm dokunma hedefleri en az 44×44 px (`.touch-target`).
+ *  - Tek sütun varsayılan; `md:` üstünde çok sütuna geçilir.
+ *  - Renkler tek yerde: aşağıdaki tokenlar. Bileşenler ham hex kullanmaz.
+ */
+
+@theme {
+  --color-sand-50: #faf7f4;
+  --color-sand-100: #f3ece5;
+  --color-sand-200: #e6dacd;
+  --color-sand-300: #d3c0ab;
+
+  --color-plum-50: #f7f2f7;
+  --color-plum-100: #ecdfec;
+  --color-plum-500: #8d5b7f;
+  --color-plum-600: #77496a;
+  --color-plum-700: #5f3a55;
+
+  --color-ink-500: #6b6259;
+  --color-ink-700: #4a423b;
+  --color-ink-900: #2b2521;
+
+  /*
+   * Vitrin tipografisi: başlıklar için serif, gövde için sistem sans.
+   * Web fontu İNDİRİLMEZ — açılış sayfası ilk boyamada hazır olsun ve
+   * çevrimdışı kurulumda da aynı görünsün diye sistem serifleri
+   * kullanılır (Windows/macOS'ta Georgia, Android'de Noto Serif).
+   */
+  --font-display: 'Georgia', 'Iowan Old Style', 'Times New Roman', 'Noto Serif', serif;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-sand-50);
+  color: var(--color-ink-900);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Sürükle-bırak takvimde metin seçimi kazayla tetiklenmesin. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* --------------------------------------------------------------------
+ * Yeniden kullanılan bileşen sınıfları
+ * ------------------------------------------------------------------ */
+
+@layer components {
+  /*
+   * NOT (Tailwind v4): `@apply` yalnızca ÇEKİRDEK utility sınıflarını
+   * kabul eder — burada tanımlanan `.btn` gibi bileşen sınıfları
+   * `@apply btn` ile tekrar kullanılamaz. Bu yüzden ortak taban kuralları
+   * seçici listesiyle paylaşılır, varyantlar yalnızca renk ekler.
+   */
+  .touch-target {
+    min-height: 2.75rem; /* 44 px — dokunma hedefi alt sınırı */
+    min-width: 2.75rem;
+  }
+
+  .card {
+    @apply rounded-2xl border border-sand-200 bg-white p-4 shadow-sm;
+  }
+
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3
+           text-sm font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed
+           disabled:opacity-50 disabled:active:scale-100;
+    min-height: 2.75rem;
+  }
+
+  .btn-primary {
+    @apply bg-plum-600 text-white hover:bg-plum-700;
+  }
+
+  .btn-secondary {
+    @apply border border-sand-300 bg-white text-ink-700 hover:bg-sand-100;
+  }
+
+  .btn-ghost {
+    @apply text-ink-700 hover:bg-sand-100;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+
+  .field {
+    @apply w-full rounded-xl border border-sand-300 bg-white px-4 py-3 text-base
+           outline-none focus:border-plum-500 focus:ring-2 focus:ring-plum-100;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink-700;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold text-ink-900;
+  }
+
+  .muted {
+    @apply text-sm text-ink-500;
+  }
+
+  /* ------------------------------------------------------------------
+   * Vitrin (açılış sayfası) bileşenleri
+   * ---------------------------------------------------------------- */
+
+  /*
+   * Sayfa gövdesi. Kabuk (`(shop)/layout.tsx`) artık kenar boşluğu
+   * uygulamaz; böylece açılış sayfası tam genişlikte fotoğraf
+   * serebilir. Sıradan sayfalar içeriklerini bu sınıfla sarar.
+   */
+  .page-shell {
+    @apply mx-auto w-full max-w-5xl px-4;
+  }
+
+  /* Fotoğrafın ekranın iki ucuna kadar taştığı bölümler */
+  .bleed {
+    @apply mx-auto w-full max-w-6xl px-4;
+  }
+
+  /* Serif başlık — pazarlama bölümlerinin sesi */
+  .display {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+    font-weight: 600;
+  }
+
+  /* Başlık üstü küçük etiket: "EKİBİMİZ", "YORUMLAR" */
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-plum-600;
+  }
+}
+
+/* --------------------------------------------------------------------
+ * Takvimde "usta serbest" (pasif / gölge) dilimin görsel dili
+ * --------------------------------------------------------------------
+ * Dolu bloklar düz renk, gölge pencereler ÇİZGİLİ ve yarı saydamdır:
+ * usta bir bakışta "burada boşum, araya iş alabilirim" der.
+ */
+.shadow-window {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(141, 91, 127, 0.16) 0px,
+    rgba(141, 91, 127, 0.16) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+  border: 1px dashed rgba(141, 91, 127, 0.55);
+}
+
+/* Sürükle-bırak sırasında tarayıcının kendi kaydırma/zoom davranışı kapanır. */
+.drag-surface {
+  touch-action: none;
+  user-select: none;
+}
+
+.dragging {
+  opacity: 0.55;
+  cursor: grabbing;
+}
