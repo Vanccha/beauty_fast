@@ -1,0 +1,24 @@
+.venv/
+__pycache__/
+*.py[cod]
+uploads/
+whatsapp-qr.png
+.pytest_cache/
+.env
+
+# Arayüz (frontend/)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+frontend/.env.*.local
+frontend/next-env.d.ts
+*.tsbuildinfo
+
+# Vitrin fotoğrafları — `cd frontend && npm run photos` ile indirilir, depoda tutulmaz
+frontend/public/photos/*
+!frontend/public/photos/CREDITS.md
+
+# Editör / OS
+.DS_Store
+Thumbs.db

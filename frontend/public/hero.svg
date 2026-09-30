@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1600 900" width="1600" height="900" preserveAspectRatio="xMidYMid slice">
+  <!--
+    ====================================================================
+    AÇILIŞ GÖRSELİ (yer tutucu illüstrasyon)
+    ====================================================================
+    Depoya telifli bir fotoğraf gömmemek için açılış görseli vektörel
+    olarak çizildi: sıcak degrade zemin, yumuşatılmış ışık lekeleri,
+    ipek/saç izlenimi veren akışkan şeritler ve altın çiçek motifleri.
+
+    KENDİ FOTOĞRAFINI KOYMAK İÇİN:
+      public/hero.jpg  (ya da .png / .webp) dosyasını ekle.
+    Ana sayfa bu dosyayı otomatik olarak tercih eder; bu illüstrasyon
+    yalnızca yedek olarak kalır. Kod değişikliği gerekmez.
+  -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#2e1b2b"/>
+      <stop offset="38%"  stop-color="#7a3f52"/>
+      <stop offset="72%"  stop-color="#c07f78"/>
+      <stop offset="100%" stop-color="#f3ddc9"/>
+    </linearGradient>
+
+    <radialGradient id="glowWarm">
+      <stop offset="0%"   stop-color="#ffd9b0" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#ffd9b0" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="glowRose">
+      <stop offset="0%"   stop-color="#ffb9c8" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#ffb9c8" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#f6e3b0"/>
+      <stop offset="50%"  stop-color="#d8b064"/>
+      <stop offset="100%" stop-color="#f6e3b0"/>
+    </linearGradient>
+
+    <filter id="blurBig" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="90"/>
+    </filter>
+    <filter id="blurMid" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="26"/>
+    </filter>
+
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+
+    <radialGradient id="vignette" cx="0.5" cy="0.45" r="0.75">
+      <stop offset="50%"  stop-color="#1a0f18" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#1a0f18" stop-opacity="0.55"/>
+    </radialGradient>
+
+    <!-- Tek yaprak: çiçek motifleri bunun döndürülmüş kopyalarından kurulur -->
+    <path id="petal" d="M0,0 C 26,-34 78,-34 104,0 C 78,34 26,34 0,0 Z"/>
+  </defs>
+
+  <!-- ============ zemin ============ -->
+  <rect width="1600" height="900" fill="url(#sky)"/>
+
+  <!-- ============ yumuşak ışık lekeleri (bokeh) ============ -->
+  <g filter="url(#blurBig)">
+    <circle cx="1250" cy="210" r="300" fill="#ffd2a8" opacity="0.55"/>
+    <circle cx="330"  cy="700" r="280" fill="#8e4f6b" opacity="0.60"/>
+    <circle cx="860"  cy="430" r="240" fill="#e8a58f" opacity="0.45"/>
+    <circle cx="130"  cy="140" r="200" fill="#43263f" opacity="0.65"/>
+  </g>
+
+  <ellipse cx="1240" cy="230" rx="420" ry="360" fill="url(#glowWarm)"/>
+  <ellipse cx="380"  cy="640" rx="380" ry="320" fill="url(#glowRose)"/>
+
+  <!-- ============ akışkan şeritler: ipek / saç izlenimi ============ -->
+  <g fill="none" stroke-linecap="round">
+    <path d="M -120,760 C 260,560 520,830 900,610 S 1400,300 1760,470"
+          stroke="#ffffff" stroke-opacity="0.20" stroke-width="5"/>
+    <path d="M -120,820 C 300,640 560,890 940,680 S 1420,380 1760,540"
+          stroke="#ffffff" stroke-opacity="0.13" stroke-width="3"/>
+    <path d="M -120,690 C 240,500 500,760 880,540 S 1380,230 1760,400"
+          stroke="url(#gold)" stroke-opacity="0.55" stroke-width="2.5"/>
+
+    <path d="M -140,300 C 220,180 430,420 780,260 S 1300,60 1740,180"
+          stroke="#ffffff" stroke-opacity="0.14" stroke-width="4"/>
+    <path d="M -140,360 C 240,240 460,470 810,320 S 1320,130 1740,250"
+          stroke="url(#gold)" stroke-opacity="0.35" stroke-width="1.8"/>
+  </g>
+
+  <!-- ============ altın çiçek motifleri ============ -->
+  <!-- sağ üst -->
+  <g transform="translate(1330 180)" opacity="0.55">
+    <g fill="url(#gold)" fill-opacity="0.5">
+      <use href="#petal" xlink:href="#petal" transform="rotate(0)"/>
+      <use href="#petal" xlink:href="#petal" transform="rotate(60)"/>
+      <use href="#petal" xlink:href="#petal" transform="rotate(120)"/>
+      <use href="#petal" xlink:href="#petal" transform="rotate(180)"/>
+      <use href="#petal" xlink:href="#petal" transform="rotate(240)"/>
+      <use href="#petal" xlink:href="#petal" transform="rotate(300)"/>
+    </g>
+    <circle r="16" fill="url(#gold)" fill-opacity="0.85"/>
+  </g>
+
+  <!-- sol alt, daha büyük ve soluk -->
+  <g transform="translate(250 760) scale(1.6)" opacity="0.3" filter="url(#blurMid)">
+    <g fill="#ffffff" fill-opacity="0.5">
+      <use href="#petal" xlink:href="#petal" transform="rotate(20)"/>
+      <use href="#petal" xlink:href="#petal" transform="rotate(80)"/>
+      <use href="#petal" xlink:href="#petal" transform="rotate(140)"/>
+      <use href="#petal" xlink:href="#petal" transform="rotate(200)"/>
+      <use href="#petal" xlink:href="#petal" transform="rotate(260)"/>
+      <use href="#petal" xlink:href="#petal" transform="rotate(320)"/>
+    </g>
+  </g>
+
+  <!-- orta, çok soluk derinlik motifi -->
+  <g transform="translate(760 620) scale(0.8)" opacity="0.22">
+    <g fill="url(#gold)" fill-opacity="0.6">
+      <use href="#petal" xlink:href="#petal" transform="rotate(10)"/>
+      <use href="#petal" xlink:href="#petal" transform="rotate(82)"/>
+      <use href="#petal" xlink:href="#petal" transform="rotate(154)"/>
+      <use href="#petal" xlink:href="#petal" transform="rotate(226)"/>
+      <use href="#petal" xlink:href="#petal" transform="rotate(298)"/>
+    </g>
+  </g>
+
+  <!-- ============ ince altın halkalar ============ -->
+  <circle cx="1180" cy="330" r="190" fill="none" stroke="url(#gold)" stroke-opacity="0.30" stroke-width="1.5"/>
+  <circle cx="1180" cy="330" r="255" fill="none" stroke="#ffffff"    stroke-opacity="0.14" stroke-width="1"/>
+  <circle cx="430"  cy="300" r="120" fill="none" stroke="#ffffff"    stroke-opacity="0.16" stroke-width="1"/>
+
+  <!-- ============ parıltılar ============ -->
+  <g fill="#ffffff">
+    <path d="M1452,96 l6,20 20,6 -20,6 -6,20 -6,-20 -20,-6 20,-6 z" opacity="0.75"/>
+    <path d="M1104,548 l4,14 14,4 -14,4 -4,14 -4,-14 -14,-4 14,-4 z" opacity="0.5"/>
+    <path d="M596,196 l5,16 16,5 -16,5 -5,16 -5,-16 -16,-5 16,-5 z" opacity="0.55"/>
+    <path d="M296,470 l3,11 11,3 -11,3 -3,11 -3,-11 -11,-3 11,-3 z" opacity="0.45"/>
+  </g>
+
+  <!-- ============ doku + vinyet ============ -->
+  <rect width="1600" height="900" filter="url(#grain)" opacity="0.06"/>
+  <rect width="1600" height="900" fill="url(#vignette)"/>
+</svg>

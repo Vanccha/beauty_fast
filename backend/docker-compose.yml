@@ -1,0 +1,68 @@
+# Lokal PostgreSQL (gelistirme + test) ve istege bagli WhatsApp gecidi.
+#
+#   docker compose up -d db
+#   DATABASE_URL=postgresql+psycopg://aurora:aurora@localhost:5432/aurora
+#   TEST_DATABASE_URL=postgresql+psycopg://aurora:aurora@localhost:5432/aurora_test
+#
+#   docker compose --profile whatsapp up -d      # + Evolution API (localhost:8080)
+#   NOTIFICATION_DRIVER=evolution
+#   EVOLUTION_API_URL=http://localhost:8080
+#   EVOLUTION_API_KEY=aurora-lokal-evolution-anahtari
+#   EVOLUTION_INSTANCE=aurora
+#   python -m app.whatsapp connect               # QR kodunu telefonla okut
+#
+# Yalnizca lokal kullanim icindir; sifreler bilerek basittir.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: aurora
+      POSTGRES_PASSWORD: aurora
+      POSTGRES_DB: aurora
+      TZ: Europe/Istanbul
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres-init.sql:/docker-entrypoint-initdb.d/10-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aurora -d aurora"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # WhatsApp gecidi (Baileys / QR ile bagli numara). Kendi verisini ayni
+  # PostgreSQL'de ayri bir sema (evolution_api) altinda tutar. Oturum
+  # dosyalari evolution_instances volume'unda kalir; silinirse QR yeniden
+  # okutulmalidir.
+  evolution:
+    profiles: ["whatsapp"]
+    image: evoapicloud/evolution-api:v2.3.6
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SERVER_URL: http://localhost:8080
+      AUTHENTICATION_API_KEY: aurora-lokal-evolution-anahtari
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://aurora:aurora@db:5432/aurora?schema=evolution_api
+      DATABASE_CONNECTION_CLIENT_NAME: aurora_evolution
+      CACHE_REDIS_ENABLED: "false"
+      CACHE_LOCAL_ENABLED: "true"
+      CONFIG_SESSION_PHONE_CLIENT: Aurora Salon
+      CONFIG_SESSION_PHONE_NAME: Chrome
+      LOG_LEVEL: ERROR,WARN,INFO
+      TZ: Europe/Istanbul
+    # Gelen mesaj bildirimleri (webhook) bilgisayarda calisan backend'e gider:
+    # EVOLUTION_WEBHOOK_URL=http://host.docker.internal:8000. Linux'ta bu adi
+    # tanimlamak icin host-gateway eslemesi gerekir.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - evolution_instances:/evolution/instances
+
+volumes:
+  pgdata:
+  evolution_instances:
