@@ -167,3 +167,20 @@ arayüz tarafındaki tamamlayıcısıdır.
 
 - [`../README.md`](../README.md) — proje geneli, hızlı başlangıç, depo yapısı.
 - [`../backend/README.md`](../backend/README.md) — API sözleşmesi, zamanlama motoru, veri modeli, testler.
+
+## PWA (mobil / tablet uygulaması)
+
+Site telefona ve tablete "uygulama" olarak yüklenebilir (Android/Chrome: **Yükle** önerisi; iOS/iPadOS Safari: **Paylaş → Ana Ekrana Ekle**).
+
+| Dosya | Görev |
+| --- | --- |
+| `src/app/manifest.ts` | Uygulama bildirimi (ad, renkler, simgeler, kısayollar) |
+| `public/sw.js` | Service worker — önbellek stratejileri dosyanın başında açıklanmıştır |
+| `src/app/offline/` | Bağlantı yokken gösterilen sayfa |
+| `src/components/pwa/` | SW kaydı, "ana ekrana ekle" önerisi |
+| `public/icons/icon.svg` | Simge kaynağı → `npm run icons` ile PNG'ler üretilir |
+
+- Service worker **yalnızca `npm run build && npm start`** ile çalışır; `npm run dev` altında kaydedilmez.
+- `/api/*` hiçbir zaman önbellekten servis edilmez (canlı müsaitlik); kişisel sayfalar ve `/admin` önbelleğe alınmaz.
+- Önbellek davranışını değiştiren bir yayında `public/sw.js` içindeki `VERSION` değerini artır.
+- Kurulum için HTTPS gerekir (`localhost` hariç). Telefonda yerel ağ IP'siyle test ederken tarayıcı yükleme önermez.
