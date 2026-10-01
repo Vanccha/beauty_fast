@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "photos": "node scripts/fetch-photos.mjs"
+    "photos": "node scripts/fetch-photos.mjs",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "next": "^15.2.0",

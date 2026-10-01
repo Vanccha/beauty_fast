@@ -124,13 +124,21 @@ body {
    * uygulamaz; böylece açılış sayfası tam genişlikte fotoğraf
    * serebilir. Sıradan sayfalar içeriklerini bu sınıfla sarar.
    */
+  /*
+   * Yatay kenar boşluğu çentiğe göre büyür: `viewportFit: cover` ile
+   * telefon yan çevrildiğinde içerik çentiğin altına girmesin.
+   */
   .page-shell {
-    @apply mx-auto w-full max-w-5xl px-4;
+    @apply mx-auto w-full max-w-5xl;
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
   }
 
   /* Fotoğrafın ekranın iki ucuna kadar taştığı bölümler */
   .bleed {
-    @apply mx-auto w-full max-w-6xl px-4;
+    @apply mx-auto w-full max-w-6xl;
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
   }
 
   /* Serif başlık — pazarlama bölümlerinin sesi */

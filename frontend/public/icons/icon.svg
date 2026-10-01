@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!--
+    Uygulama simgesi (kaynak). PNG sürümleri bu dosyadan üretilir:
+      cd frontend && npm run icons
+    Harf yazı tipine bağlı kalmasın diye "A" yol (path) olarak çizildi.
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#8d5b7f"/>
+      <stop offset="100%" stop-color="#5f3a55"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path fill="#faf7f4" fill-rule="evenodd"
+        d="M226 128h60l92 256h-56l-19-56h-94l-19 56h-56zm30 64-31 92h62z"/>
+  <path fill="#f3ddc9"
+        d="M360 120c4 22 10 28 32 32-22 4-28 10-32 32-4-22-10-28-32-32 22-4 28-10 32-32z"/>
+</svg>

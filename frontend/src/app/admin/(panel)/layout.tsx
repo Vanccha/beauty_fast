@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
+import { InstallButton } from '@/components/pwa/InstallBanner';
 import { serverApi, type MeResponse, type SalonInfo } from '@/lib/server-api';
 import { AdminNavLink, StaffLogout } from './nav';
 import type { MessagingStatus } from './whatsapp/whatsapp-connect';
@@ -56,6 +57,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <InstallButton />
             <Link href="/" className="btn-ghost hidden text-sm md:inline-flex">
               Siteyi gör
             </Link>
@@ -85,7 +87,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </div>
       )}
 
-      <main className="mx-auto max-w-7xl px-4 py-4">{children}</main>
+      <main className="mx-auto max-w-7xl px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">{children}</main>
     </div>
   );
 }
