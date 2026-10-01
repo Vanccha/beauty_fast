@@ -148,6 +148,40 @@ body {
     font-weight: 600;
   }
 
+  /* Hukuki metinler (/kvkk, /acik-riza, /cerez-politikasi) */
+  .legal h2 {
+    @apply mt-8 scroll-mt-24 text-lg font-semibold text-ink-900;
+  }
+  .legal h3 {
+    @apply mt-5 font-semibold text-ink-900;
+  }
+  .legal p,
+  .legal li {
+    @apply text-[0.95rem] leading-relaxed text-ink-700;
+  }
+  .legal p {
+    @apply mt-3;
+  }
+  .legal ul {
+    @apply mt-3 list-disc space-y-1.5 pl-5;
+  }
+  .legal ol {
+    @apply mt-3 list-decimal space-y-1.5 pl-5;
+  }
+  .legal table {
+    @apply mt-3 w-full border-collapse text-sm;
+  }
+  .legal th,
+  .legal td {
+    @apply border border-sand-200 px-3 py-2 text-left align-top;
+  }
+  .legal th {
+    @apply bg-sand-100 font-semibold;
+  }
+  .legal a {
+    @apply text-plum-700 underline;
+  }
+
   /* Başlık üstü küçük etiket: "EKİBİMİZ", "YORUMLAR" */
   .eyebrow {
     @apply text-xs font-semibold uppercase tracking-[0.18em] text-plum-600;

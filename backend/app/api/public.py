@@ -43,6 +43,7 @@ from ..services.reviews import (
     list_reviews,
 )
 from ..services.notifications import deliver_due_notifications
+from ..services.privacy import sweep_retention
 from ..services.soft_lock import sweep_expired_locks
 from ..services.welcome import build_welcome, get_opening_hours, get_salon_stats
 from ..time_utils import now_local
@@ -373,7 +374,8 @@ def cron_sweep(db: DbSession) -> dict:
 
       1) Suresi dolmus soft-lock'lari ve hucrelerini siler
       2) Suresi dolmus oturum/OTP/deneme siniri kayitlarini siler
-      3) Zamani gelmis bildirimleri gonderir (``NOTIFICATION_DRIVER``:
+      3) KVKK saklama suresi dolan kayitlari siler (``services/privacy.py``)
+      4) Zamani gelmis bildirimleri gonderir (``NOTIFICATION_DRIVER``:
          console -> log, evolution -> WhatsApp). Ayrinti:
          ``services/notifications.py::deliver_due_notifications``.
 
@@ -388,6 +390,7 @@ def cron_sweep(db: DbSession) -> dict:
     sessions = sweep_expired_sessions(db, now)
     rate_limits = sweep_rate_limits(db, now)
     db.commit()
+    retention = sweep_retention(db, now)
 
     delivery = deliver_due_notifications(db, now)
 
@@ -396,6 +399,7 @@ def cron_sweep(db: DbSession) -> dict:
         **locks,
         **sessions,
         "removedRateLimitHits": rate_limits,
+        **retention,
         "notificationsSent": delivery["sent"],
         "notificationsFailed": delivery["failed"],
         #: True ise gonderim yapilmadi (orn. WhatsApp baglantisi kopuk).

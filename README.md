@@ -231,7 +231,7 @@ birini kullanın: `05321010000` … `05321010024` (25 demo müşteri).
 | `messaging.py` | Mesaj sürücüleri: `console` (log) ve `evolution` (WhatsApp, Evolution API). |
 | `welcome.py` | Kişiselleştirilmiş karşılama metni + salon istatistikleri (uydurma veri yok, gerçek son randevudan türetilir). |
 
-### `backend/tests/` — 190 test
+### `backend/tests/` — 201 test
 
 | Dosya | Kapsam |
 |---|---|
@@ -249,6 +249,7 @@ birini kullanın: `05321010000` … `05321010024` (25 demo müşteri).
 | `test_api.py` | Uçtan uca API: zarf, yetki kapıları, randevu akışı, yorum kapıları. |
 | `test_admin_views.py` | Panel sayfalarını besleyen uçlar: bildirim kuyruğu, galeri listesi, fırsat saati bayrakları. |
 | `test_whatsapp_welcome.py` | WhatsApp'ta ilk mesaja karşılama ve "tanıdık kişi" kuralları. |
+| `test_kvkk.py` | KVKK: ileti onayı, alerji rızası, veri dökümü, hesap silme (anonimleştirme), saklama süreleri. |
 | `test_messaging.py` | WhatsApp (Evolution API) gönderimi: istemci, OTP, kuyruk yeniden denemeleri. |
 | `test_security.py` | OTP kaba kuvvet koruması, deneme sınırları, bakım ucu yetkisi, üretim yapılandırma doğrulaması, saat dilimi. |
 

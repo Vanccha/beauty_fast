@@ -36,6 +36,7 @@ from ..config import config
 from ..models import ScheduledNotification
 from ..time_utils import now_local
 from . import messaging
+from .privacy import MARKETING_DEDUPE_PREFIX, is_marketing_allowed
 from .whatsapp_inbound import mark_phone_known
 
 logger = logging.getLogger("aurora.notifications")
@@ -99,6 +100,13 @@ def _claim_due(db: Session, now: datetime, limit: int) -> list[tuple[int, str, s
 
     claimed = []
     for n in rows:
+        # Onay kuyruga alindiktan SONRA geri alinmis olabilir (veya hesap
+        # silinmis): ticari ileti gonderilmez, kayit iptal edilir.
+        if n.dedupe_key.startswith(MARKETING_DEDUPE_PREFIX) and not is_marketing_allowed(
+            n.customer
+        ):
+            n.status = "CANCELLED"
+            continue
         n.status = "SENDING"
         n.next_attempt_at = now + CLAIM_LEASE
         claimed.append((n.id, n.customer.phone, n.body))

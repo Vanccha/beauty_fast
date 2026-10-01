@@ -34,7 +34,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import admin, appointments, auth, catalog, public, slots, webhooks
+from .api import admin, appointments, auth, catalog, privacy, public, slots, webhooks
 from .config import config, validate_config
 from .db import init_db
 from .errors import AppError
@@ -109,6 +109,7 @@ app.add_exception_handler(Exception, unexpected_error_handler)
 
 app.include_router(auth.router)
 app.include_router(public.router)
+app.include_router(privacy.router)
 app.include_router(catalog.router)
 app.include_router(slots.router)
 app.include_router(appointments.router)

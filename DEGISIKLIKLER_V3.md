@@ -1,10 +1,14 @@
 # Aurora V3 — Değişenler
 
 **Tarih:** 1 Ekim 2026
-**Kapsam:** Yalnızca arayüz (`frontend/`). Backend'de değişiklik yok.
-**Amaç:** Siteyi telefonda ve tablette bir uygulama gibi kullanılabilir hale getirmek (PWA): ana ekrana yüklenebilmesi, kendi penceresinde açılması, bağlantı koptuğunda düzgün bir sayfa göstermesi ve çentikli ekranlarda doğru oturması.
+**Kapsam:** Arayüz (`frontend/`) ve backend (`backend/`). Backend değişiklikleri yalnızca KVKK maddelerinde (9–14); PWA maddeleri (1–8) yalnızca arayüzde.
+**Amaç:**
+- Siteyi telefonda ve tablette bir uygulama gibi kullanılabilir hale getirmek (PWA): ana ekrana yüklenebilmesi, kendi penceresinde açılması, bağlantı koptuğunda düzgün bir sayfa göstermesi ve çentikli ekranlarda doğru oturması.
+- KVKK uyumu: aydınlatma, açık rıza ve çerez metinleri; ileti onayı ve sağlık verisi rızasının sistemde toplanması; müşterinin verisini indirme ve hesabını silme hakkı; saklama sürelerinin otomatik uygulanması.
 
-Yeni npm bağımlılığı eklenmedi. `next-pwa` Next 15 ile sorunlu olduğu için Next'in yerleşik manifest desteği ve elle yazılmış küçük bir service worker kullanıldı.
+> ⚠️ **Canlıya çıkmadan önce:** KVKK metinlerindeki şirket unvanı, MERSİS/vergi bilgisi, e-posta ve KEP adresi **temsilidir**. Satış yapılan salona göre `frontend/src/lib/legal.ts` dosyasından güncellenecek ve metinler hukukçuya gözden geçirtilecek. Ayrıntılı liste: "Canlıya çıkmadan önce: KVKK" bölümü.
+
+Test sayısı 190'dan 201'e çıktı. Yeni npm veya pip bağımlılığı eklenmedi. `next-pwa` Next 15 ile sorunlu olduğu için Next'in yerleşik manifest desteği ve elle yazılmış küçük bir service worker kullanıldı.
 
 ---
 
@@ -20,6 +24,12 @@ Yeni npm bağımlılığı eklenmedi. `next-pwa` Next 15 ile sorunlu olduğu iç
 | 6 | iOS meta etiketleri | 🟢 Yeni özellik |
 | 7 | Çentik ve ana ekran çubuğu için güvenli alan boşlukları | 🟠 Mobil düzen |
 | 8 | `sw.js` için önbellek başlığı | 🟠 Altyapı |
+| 9 | KVKK Aydınlatma Metni, Açık Rıza Metinleri, Çerez Politikası sayfaları | 🔵 KVKK |
+| 10 | Ticari ileti onayı: giriş formunda isteğe bağlı kutu, onaysız müşteriye tekrar hatırlatması gitmez | 🔵 KVKK |
+| 11 | Alerji (sağlık verisi) kaydında açık rıza zorunluluğu | 🔵 KVKK |
+| 12 | Hesabım → "Gizlilik ve verilerim": onay yönetimi, verilerimi indir, hesabımı sil | 🔵 KVKK |
+| 13 | Saklama sürelerinin bakım işinde otomatik uygulanması | 🔵 KVKK |
+| 14 | Veritabanı: migration `0005` (rıza ve anonimleştirme alanları) | 🔵 KVKK |
 
 ---
 
@@ -141,6 +151,118 @@ Masaüstünde ve çentiksiz cihazlarda güvenli alan değeri 0 olduğu için gö
 
 ---
 
+## 🔵 KVKK
+
+Önce sistemin gerçekte işlediği kişisel veriler `backend/app/models.py` üzerinden çıkarıldı; metinler ve kurallar bu envantere göre yazıldı. Hassas bulgular:
+- **Alerji kaydı:** KVKK m.6'ya göre özel nitelikli sağlık verisi; yalnızca açık rızayla işlenebilir. Önceden rıza alınmıyordu.
+- **"Bakım zamanın geldi" tekrar hatırlatmaları:** 6563 sayılı Kanun'a göre ticari ileti; önceden onay istenmiyordu.
+- **Salonlar arası risk havuzu:** Telefonun hash'i ve gelme/gelmeme bilgisi paylaşılıyor.
+- **Eksik haklar:** Müşterinin verisini indirmesinin veya hesabını silmesinin bir yolu yoktu.
+
+### 9. Metin sayfaları
+
+| Sayfa | İçerik |
+|---|---|
+| `/kvkk` | Aydınlatma Metni (KVKK m.10): veri sorumlusu, veri kategorileri / amaç / hukuki sebep tablosu, toplama yöntemi, aktarımlar (WhatsApp yurt dışı, barındırma, risk havuzu), saklama süreleri, m.11 hakları, başvuru yöntemi |
+| `/acik-riza` | İki **ayrı** rıza metni: `#ticari-ileti` ve `#saglik`. İkisi de isteğe bağlı; randevu almanın şartı değil |
+| `/cerez-politikasi` | Kullanılan tüm çerezler ve tarayıcı depoları (oturum, `visitor_key`, PWA önbelleği, localStorage) |
+
+- **Yer:** `frontend/src/app/(shop)/kvkk`, `acik-riza`, `cerez-politikasi`. Ortak kabuk `src/components/legal/LegalDocument.tsx`.
+- **Salon bilgileri:** Salon adı, adres ve telefon sistemden (`/api/showcase`) geliyor. Yasal kimlik bilgileri `src/lib/legal.ts` dosyasında tek yerde.
+- **Temsili uyarı:** `legal.ts` içinde `isRepresentative: true` olduğu sürece her metnin başında sarı bir "Temsili metindir" uyarısı görünüyor. Gerçek bilgiler girilince `false` yapılmalı.
+- **Bağlantılar:** Alt bilgiye üç metnin bağlantısı eklendi. Giriş formunda, numara girilirken aydınlatma metni bağlantısı gösteriliyor (veri toplanmadan önce).
+- **Çerez onay penceresi yok, bilinçli olarak:** Sitede yalnızca zorunlu çerezler var; analitik veya reklam çerezi yok. İleride böyle bir araç eklenirse önce onay penceresi eklenmeli.
+
+### 10. Ticari ileti onayı
+
+- **Giriş formu:** "Bakım zamanı hatırlatmaları ve kampanyalar için WhatsApp ile ileti almak istiyorum" kutusu eklendi. İsteğe bağlı ve **varsayılan olarak işaretsiz**.
+- **Kayıt:** İşaretlenirse `customer.marketing_consent_at` alanına onay zamanı yazılıyor. Kutu işaretlenmeden tekrar giriş yapmak mevcut onayı geri almıyor.
+- **Kuyruğa alma:** Randevu tamamlanınca üretilen tekrar hatırlatması (`repeat:` anahtarlı) yalnızca onaylı müşteri için kuyruğa giriyor.
+- **Gönderim anında kontrol:** Onay kuyruğa alındıktan sonra geri alınmış olabilir. Bu durumda mesaj gönderilmiyor, kayıt `CANCELLED` oluyor.
+- **Geri alma:** Onay geri alınınca bekleyen tekrar hatırlatmaları hemen iptal ediliyor.
+- **Randevu öncesi hatırlatma** (`pre:` anahtarlı) hizmet bildirimidir; onaydan bağımsız gönderilmeye devam ediyor.
+- **Panel:** Müşteri kartında "İleti onayı var / yok" rozeti görünüyor.
+
+### 11. Alerji kaydında açık rıza
+
+- Müşterinin **ilk** alerji kaydında personel "Müşteriye sağlık verisi açık rıza metnini okuttum ve açık rıza verdi" kutusunu işaretlemek zorunda. Kutu işaretlenmeden **Kaydet** pasif.
+- Sunucu da aynı kuralı uyguluyor (`CONSENT_REQUIRED`). Rıza zamanı `customer.health_consent_at` alanına yazılıyor; sonraki kayıtlarda kutu tekrar sorulmuyor.
+- Müşteri rızasını Hesabım'dan geri alırsa tüm alerji kayıtları **kalıcı olarak siliniyor**. Müşteri rızayı kendisi "verildi" yapamıyor; rıza salonda alınıyor.
+- **Mevcut veriler:** Migration, daha önce alerji kaydı olan müşterilerin rıza tarihini ilk alerji kaydının tarihiyle dolduruyor. Gerçek bir salonda bu müşterilerden yazılı rıza ayrıca alınmalı.
+
+### 12. Hesabım → "Gizlilik ve verilerim"
+
+Hesabım sayfasının altına eklendi (`/hesabim#gizlilik`). Dört işlem:
+
+| İşlem | Davranış | Uç nokta |
+|---|---|---|
+| İleti onayı aç/kapat | Anahtar düğme; onay tarihi gösteriliyor | `PATCH /api/me/privacy` |
+| Alerji rızasını geri al | Onay adımından sonra alerji kayıtları silinir | `PATCH /api/me/privacy` |
+| Verilerimi indir | Profil, rızalar, randevular, alerjiler, paylaşılan notlar, fotoğraflar, yorumlar, puan geçmişi (JSON) | `GET /api/me/export` |
+| Hesabımı sil | Onay adımından sonra hesap anonimleştirilir ve oturum kapanır | `DELETE /api/me` |
+
+**Hesap silme satırı silmiyor, anonimleştiriyor.** Randevu tablosu müşteriye `CASCADE` ile bağlı olduğu için satır silinseydi salonun ciro ve doluluk geçmişi de silinirdi.
+- **Silinenler:** alerjiler, personel notları, fotoğraflar (diskteki dosyalar dahil), tasarım referansları, yorumlar, bekleyen bildirimler, kampanya hakları, oturumlar, doğrulama kodları ve randevu notları.
+- **Boşaltılanlar:** ad, telefon, e-posta, doğum tarihi ve rızalar. Ad "Silinmiş üye" oluyor, telefon `X000000026` gibi bir yer tutucuya dönüşüyor.
+- **Kalanlar:** Randevu satırları kimliksiz istatistik olarak kalıyor.
+- **Engel:** Yaklaşan randevusu olan müşteri hesabını silemiyor; önce iptal etmesi isteniyor.
+- **Sonrası:** Silinen müşteri panel listesinde görünmüyor. Aynı numarayla yeniden kayıt olunabiliyor; yeni ve boş bir hesap açılıyor.
+
+**Bilinçli karar:** Personelin `STAFF_ONLY` notları self-servis dökümde yer almıyor. Bunlar da kişisel veri; müşteri yazılı başvuru yaparsa salon tarafından ayrıca verilmeli. Hukukçuya sorulacaklar listesinde.
+
+### 13. Saklama süreleri
+
+`POST /api/cron/sweep` bakım işi artık şunları da siliyor (`backend/app/services/privacy.py`):
+
+| Kayıt | Süre |
+|---|---|
+| Saat görüntüleme sayaçları (`slot_view_event`) | 30 gün |
+| Gönderilmiş / başarısız / iptal bildirimler | 180 gün (bekleyenlere dokunulmuyor) |
+| Risk havuzu kayıtları (`phone_risk_event`) | 12 ay (risk skoru son 6 ayı kullanıyor) |
+
+Doğrulama kodları ve oturumlar zaten süreleri dolunca siliniyordu. Metinlerdeki süreler `frontend/src/lib/legal.ts` → `RETENTION` içinde. Backend'de bir süre değişirse orası da güncellenmeli.
+
+### 14. Veritabanı
+
+Migration `0005_kvkk_riza_ve_anonimlestirme`: `customer` tablosuna `marketing_consent_at`, `health_consent_at`, `anonymized_at` alanları eklendi. Geliştirme veritabanına uygulandı; `alembic check` şema farkı bulmuyor.
+
+### Testler (KVKK)
+
+`backend/tests/test_kvkk.py`, 11 test:
+- İleti onayının yalnızca açıkça verilince kaydedilmesi.
+- Onay geri alınınca yalnızca ticari iletilerin iptali.
+- Onaysız müşteriye tekrar hatırlatmasının kuyruğa alınmaması ve gönderilmemesi.
+- Alerji kaydında rıza zorunluluğu; rıza geri alınınca alerjilerin silinmesi.
+- Dökümde gizli notların bulunmaması.
+- Yaklaşan randevuda silmenin engellenmesi; anonimleştirmenin kapsamı ve oturumun kapanması.
+- Silinen müşterinin panelde görünmemesi.
+- Saklama süresi temizliğinin yalnızca süresi dolanları silmesi.
+
+`tests/conftest.py`'de test temizliğine `SlotViewEvent` eklendi.
+
+---
+
+## Canlıya çıkmadan önce: KVKK
+
+Bu sürümdeki KVKK metinleri **temsili** ve hukuki görüş değil. Satış yapılan salona göre aşağıdakiler revize edilecek:
+
+| Yapılacak | Ayrıntı |
+|---|---|
+| **Veri sorumlusu bilgileri** | `frontend/src/lib/legal.ts`: ticari unvan (şahıs işletmesiyse ad soyad), MERSİS no, vergi dairesi/no, KVKK başvuru e-postası, KEP adresi, güncelleme tarihi. Sonra `isRepresentative: false` |
+| **Hukukçu incelemesi** | Üç metnin tamamı. Özellikle aşağıdaki maddeler |
+| **WhatsApp ve yurt dışı aktarım (m.9)** | Mesajlar WhatsApp (Meta) sunucularından geçiyor. Hangi aktarım mekanizmasının (standart sözleşme vb.) kullanılacağı belirlenmeli. Evolution API resmî WhatsApp Business API değil; bu da ayrıca değerlendirilmeli |
+| **Salonlar arası risk havuzu** | Hash'lenmiş telefon diğer salonlarla ortak havuzda kullanılıyor; hukuki sebep "meşru menfaat" olarak yazıldı. Tek salonlu kurulumda havuz fiilen salon içinde kalır. Çok salonlu kullanımda ayrıca değerlendirilmeli |
+| **Doğum tarihi** | "Meşru menfaat (doğum günü indirimi)" olarak yazıldı; açık rıza gerekip gerekmediği netleştirilmeli |
+| **Personel gizli notları** | Self-servis dökümde yok; yazılı başvuruda verilmeleri gerekip gerekmediği netleştirilmeli |
+| **İYS kaydı** | Ticari ileti gönderen işletme İleti Yönetim Sistemi'ne kayıt olmalı, onaylar İYS'ye bildirilmeli. Onay kanıtının onay bittikten sonra 3 yıl saklanması gerekir; şu an geri alınan onayın tarihi tutulmuyor (İYS'ye geçişle birlikte ele alınmalı) |
+| **VERBİS** | Salonun VERBİS kayıt yükümlülüğü olup olmadığı (çalışan sayısı / ciro / özel nitelikli veri işleme) kontrol edilmeli |
+| **Mevcut alerji kayıtları** | Migration öncesi girilmiş alerjiler için müşterilerden yazılı rıza alınmalı |
+| **Mevcut müşterilerin ileti onayı** | Mevcut müşterilerde onay yok; bu sürümle birlikte onlara tekrar hatırlatması gitmez. İsteyenler Hesabım'dan ya da bir sonraki girişte onay verebilir |
+| **Personel bilgilendirmesi** | Çalışanlara (personel verisi: ad, telefon, fotoğraf) ayrı bir çalışan aydınlatma metni verilmeli. Bu sürümde yalnızca müşteri metinleri var |
+| **Veri işleme sözleşmeleri** | Barındırma sağlayıcısı ile veri işleyen sözleşmesi |
+
+---
+
 ## Dosya listesi
 
 **Yeni:**
@@ -162,6 +284,30 @@ Masaüstünde ve çentiksiz cihazlarda güvenli alan değeri 0 olduğu için gö
 - `frontend/package.json`: `npm run icons` betiği
 - `frontend/README.md`: PWA bölümü
 
+**KVKK — yeni:**
+- `backend/app/services/privacy.py`, `backend/app/api/privacy.py`
+- `backend/migrations/versions/0005_kvkk_riza_ve_anonimlestirme.py`
+- `backend/tests/test_kvkk.py`
+- `frontend/src/app/(shop)/kvkk/page.tsx`, `acik-riza/page.tsx`, `cerez-politikasi/page.tsx`
+- `frontend/src/app/(shop)/hesabim/privacy-panel.tsx`
+- `frontend/src/components/legal/LegalDocument.tsx`, `frontend/src/lib/legal.ts`
+
+**KVKK — değişen:**
+- `backend/app/models.py`: `Customer` rıza ve anonimleştirme alanları
+- `backend/app/main.py`: gizlilik router'ı
+- `backend/app/api/auth.py`: girişte ileti onayı
+- `backend/app/api/admin.py`: alerji kaydında rıza kapısı, müşteri kartında rıza durumu
+- `backend/app/api/public.py`: bakım işine saklama süresi temizliği
+- `backend/app/services/appointment_status.py`: tekrar hatırlatması yalnızca onaylıya
+- `backend/app/services/notifications.py`: gönderim anında onay kontrolü
+- `backend/app/services/customer_profile.py`: rıza alanları, silinen müşteriler listede yok
+- `backend/tests/conftest.py`: `SlotViewEvent` temizliği
+- `frontend/src/app/(shop)/giris/login-form.tsx`: ileti onay kutusu, aydınlatma bağlantısı
+- `frontend/src/app/(shop)/hesabim/page.tsx`: gizlilik bölümü
+- `frontend/src/app/(shop)/layout.tsx`: alt bilgide yasal metin bağlantıları
+- `frontend/src/app/admin/(panel)/musteriler/[id]/page.tsx`, `crm-editors.tsx`: rıza kutusu ve rozeti
+- `frontend/src/app/globals.css`: `.legal` metin stilleri
+
 ## Doğrulama
 
 - `npm run typecheck` ve `npm run build` hatasız. `/offline` ve `/manifest.webmanifest` statik üretiliyor.
@@ -178,11 +324,23 @@ Masaüstünde ve çentiksiz cihazlarda güvenli alan değeri 0 olduğu için gö
 - **Bilinen sınır:** Çevrimdışı vitrin sayfalarında yalnızca daha önce ekranda görülmüş fotoğraflar çıkar; hiç kaydırılıp görülmemiş görseller önbellekte olmaz.
 - **Henüz yapılmadı:** Gerçek bir telefonda veya tablette yükleme ve çevrimdışı davranış denenmedi (aşağıya bakınız).
 
+**KVKK:**
+- Backend testlerinin tamamı geçiyor (201).
+- `npm run typecheck` ve `npm run build` hatasız. Migration geliştirme veritabanına uygulandı; `alembic check` şema farkı bulmuyor.
+- **Tarayıcıda uçtan uca denendi:**
+  - Giriş formunda ileti onay kutusu işaretlenerek yeni bir test müşterisi açıldı; onay Hesabım'da tarihiyle göründü.
+  - Anahtar düğmeyle onay geri alındı; veri dökümü ucu çağrılıp içeriği kontrol edildi (İndir düğmesine tıklanmadı).
+  - Hesap silindi: oturum kapandı, ana sayfaya dönüldü, veritabanında kayıt "Silinmiş üye" olarak anonimleşti.
+  - Panelde rızası olmayan müşteride alerji formunun rıza kutusu çıktı; kutu işaretlenmeden **Kaydet** pasif kaldı.
+- **Fark edilen, bu sürümde düzeltilmeyen hata (KVKK'dan bağımsız, önceden vardı):** Yeni üye girişinde ad adımı adı kaydetmiyor; müşteri "Yeni Üye" adıyla kalıyor. Sebep: ad, doğrulama kodu ikinci kez gönderilerek kaydediliyor, ama kod ilk denemede tüketildiği için bu istek başarısız oluyor.
+
 ---
 
 ## Uyumluluk notları (V2'den geçerken)
 
-- **Backend:** Değişiklik yok, V2 backend'iyle olduğu gibi çalışıyor.
+- **Backend ve veritabanı:** KVKK için yeni migration var. Güncellemeden sonra `cd backend` ve `alembic upgrade head` çalıştırılmalı (Docker imajı açılışta bunu kendisi yapıyor).
+- **Tekrar hatırlatmaları:** Artık yalnızca ileti onayı veren müşterilere gidiyor. Mevcut müşterilerde onay olmadığı için, onlar onay verene kadar bu mesajlar gönderilmeyecek. Kuyrukta bekleyenler gönderim anında iptal edilecek.
+- **Alerji kaydı:** Panelde ilk alerji kaydında rıza kutusu zorunlu. API'yi doğrudan kullanan bir istemci varsa `consentConfirmed: true` göndermeli, aksi halde `CONSENT_REQUIRED` hatası alır.
 - **Geliştirme:** `npm run dev` davranışı değişmedi; SW geliştirmede kapalı. PWA'yı denemek için `npm run build && npm start`.
 - **HTTPS şartı:** Tarayıcılar yalnızca HTTPS'te (veya `localhost`'ta) uygulama yüklemeye ve SW çalıştırmaya izin veriyor. Telefondan yerel ağ IP'siyle (`http://192.168.x.x:3000`) açıldığında yükleme önerisi çıkmaz ve SW kaydedilmez.
 - **Yayın:** Önbellek davranışını değiştiren her yayında `public/sw.js` içindeki `VERSION` artırılmalı.

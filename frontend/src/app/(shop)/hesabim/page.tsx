@@ -6,6 +6,7 @@ import { formatTl } from '@/lib/api-client';
 import { serverApi, type MeResponse } from '@/lib/server-api';
 import { formatDateTr, minutesToLabel } from '@/lib/time';
 import { AppointmentActions, LogoutButton } from './actions';
+import { PrivacyPanel, type PrivacyStatus } from './privacy-panel';
 import { ReviewForm } from './review-form';
 
 /** `GET /api/appointments/mine` içindeki tek randevu. */
@@ -49,9 +50,10 @@ export default async function AccountPage() {
   const me = await serverApi<MeResponse>('/api/me');
   if (!me.customer) redirect('/giris?next=/hesabim');
 
-  const [mine, album] = await Promise.all([
+  const [mine, album, privacy] = await Promise.all([
     serverApi<MineResponse>('/api/appointments/mine'),
     serverApi<AlbumResponse>('/api/me/album'),
+    serverApi<PrivacyStatus>('/api/me/privacy'),
   ]);
 
   // JSX aynı kalsın diye kalemler eski biçimde paketlenir.
@@ -231,6 +233,8 @@ export default async function AccountPage() {
           </ul>
         )}
       </section>
+
+      <PrivacyPanel initial={privacy} />
     </div>
   );
 }

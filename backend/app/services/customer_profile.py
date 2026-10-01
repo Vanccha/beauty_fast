@@ -140,6 +140,8 @@ def build_customer_profile(
         "email": customer.email,
         "birthDate": customer.birth_date,
         "engagementOptIn": customer.engagement_opt_in,
+        "marketingConsent": customer.marketing_consent_at is not None,
+        "healthConsent": customer.health_consent_at is not None,
         "loyaltyPoints": customer.loyalty_points,
         "tier": tier,
         "tierProgress": progress_to_next_tier(customer.loyalty_points),
@@ -164,7 +166,10 @@ def list_customer_summaries(db: Session, branch_id: int, now: datetime | None = 
     """
     now = now or now_local()
 
-    customers = db.scalars(select(Customer).order_by(Customer.id)).all()
+    # Hesabini silen (anonimlestirilen) musteriler listede gosterilmez.
+    customers = db.scalars(
+        select(Customer).where(Customer.anonymized_at.is_(None)).order_by(Customer.id)
+    ).all()
     rows = db.execute(
         select(
             Appointment.customer_id,

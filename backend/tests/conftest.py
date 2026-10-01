@@ -64,6 +64,7 @@ from app.models import (  # noqa: E402
     ServiceConsumable,
     ServiceResource,
     SlotLock,
+    SlotViewEvent,
     Staff,
     StaffService,
     StockMovement,
@@ -97,7 +98,7 @@ def db():
 def clean_db(db):
     """Her test temiz bir veritabaniyla baslar."""
     for model in (
-        RateLimitHit, VerificationCode, ScheduledNotification, WhatsappContact,
+        RateLimitHit, VerificationCode, ScheduledNotification, WhatsappContact, SlotViewEvent,
         OccupancyCell, SlotLock, StockMovement, LoyaltyEntry, PhoneRiskEvent,
         AppointmentResource, AppointmentItem, Appointment, ServiceConsumable,
         InventoryItem, ServiceResource, StaffService, WorkingHour, Resource,

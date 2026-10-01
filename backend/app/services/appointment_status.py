@@ -42,6 +42,7 @@ from ..models import (
     ScheduledNotification,
 )
 from ..time_utils import now_local, to_datetime
+from .privacy import is_marketing_allowed
 from .risk import record_risk_event
 from .stock import consume_for_appointment
 
@@ -210,8 +211,10 @@ def change_appointment_status(
                 )
             ).all()
 
+            # KVKK / 6563: tekrar hatirlatmasi ticari iletidir - onay yoksa
+            # kuyruga hic alinmaz.
             first = appointment.items[0] if appointment.items else None
-            if first is not None:
+            if first is not None and is_marketing_allowed(customer):
                 reminder = resolve_reminder(
                     [
                         ReminderRuleSpec(

@@ -591,7 +591,8 @@ def customer_detail(customer_id: int, staff: StaffDep, db: DbSession) -> dict:
             k: profile[k]
             for k in (
                 "id", "firstName", "lastName", "phone", "email", "birthDate",
-                "engagementOptIn", "loyaltyPoints", "tier", "tierProgress",
+                "engagementOptIn", "marketingConsent", "healthConsent",
+                "loyaltyPoints", "tier", "tierProgress",
                 "totalSpend", "visitCount", "noShowCount", "lastVisitDaysAgo",
             )
         },
@@ -656,6 +657,9 @@ class AllergyBody(BaseModel):
     label: str = Field(min_length=1, max_length=120)
     severity: str = "HIGH"
     note: str | None = Field(default=None, max_length=500)
+    #: KVKK m.6: alerji saglik verisidir. Musterinin ilk alerji kaydinda
+    #: personel, musteriden acik riza alindigini teyit etmek ZORUNDADIR.
+    consentConfirmed: bool = False
 
     @field_validator("severity")
     @classmethod
@@ -673,6 +677,19 @@ def add_allergy(customer_id: int, body: AllergyBody, staff: StaffDep, db: DbSess
     gorunur ve randevu olusturma yanitinda ``allergyWarnings`` alaninda
     doner - usta isleme baslamadan uyariyi gorur.
     """
+    customer = db.get(Customer, customer_id)
+    if customer is None or customer.anonymized_at is not None:
+        raise AppError("NOT_FOUND", "Müşteri bulunamadı.", 404)
+    if customer.health_consent_at is None:
+        if not body.consentConfirmed:
+            raise AppError(
+                "CONSENT_REQUIRED",
+                "Alerji bilgisi sağlık verisidir. Kaydetmeden önce müşterinin açık rızasını "
+                "aldığınızı onaylayın.",
+                400,
+            )
+        customer.health_consent_at = now_local()
+
     allergy = Allergy(
         customer_id=customer_id, label=body.label, severity=body.severity, note=body.note
     )
