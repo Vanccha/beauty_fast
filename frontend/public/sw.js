@@ -17,7 +17,7 @@
  *
  * Yeni sürüm yayınlarken VERSION değerini artırmak eski önbellekleri temizler.
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const STATIC_CACHE = `aurora-static-${VERSION}`;
 const PAGE_CACHE = `aurora-pages-${VERSION}`;
 const MEDIA_CACHE = `aurora-media-${VERSION}`;
@@ -34,10 +34,31 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(STATIC_CACHE)
-      .then((cache) => cache.addAll(PRECACHE))
+      .then(async (cache) => {
+        await cache.addAll(PRECACHE);
+        await precacheOfflineAssets(cache);
+      })
       .then(() => self.skipWaiting()),
   );
 });
+
+/**
+ * /offline sayfasının HTML'i tek başına yetmez: sayfanın JS ve CSS
+ * parçaları da önbellekte olmalı, yoksa çevrimdışıyken "ChunkLoadError"
+ * ile çöker. Dosya adları her derlemede değiştiği için listeyi elle
+ * tutmak yerine önbelleğe alınan HTML'in içinden okunur.
+ */
+async function precacheOfflineAssets(cache) {
+  const response = await cache.match(OFFLINE_URL);
+  if (!response) return;
+  const html = await response.text();
+  const assets = new Set();
+  // Hem <script src="/_next/static/..."> hem de RSC yükündeki "static/chunks/..." biçimi.
+  for (const [match] of html.matchAll(/(?:\/_next\/)?static\/(?:chunks|css|media)\/[^"'\\\s)]+/g)) {
+    assets.add(match.startsWith('/_next/') ? match : `/_next/${match}`);
+  }
+  await cache.addAll([...assets]);
+}
 
 self.addEventListener('activate', (event) => {
   const keep = new Set([STATIC_CACHE, PAGE_CACHE, MEDIA_CACHE]);

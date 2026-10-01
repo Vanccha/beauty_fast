@@ -68,7 +68,7 @@ Simge değiştirilecekse yalnızca `icon.svg` düzenlenip `npm run icons` çalı
 
 **Gizlilik kararı:** `/hesabim`, `/giris`, `/randevu` ve tüm `/admin` sayfaları **önbelleğe alınmıyor**. Salonda paylaşılan bir tablette bir müşterinin veya personelin bilgileri, oturum kapandıktan sonra önbellekten başkasına görünmesin diye.
 
-**Sürüm yönetimi:** Dosyanın başındaki `VERSION` değeri (`v1`) önbellek adlarının parçası. Değeri artırıp yayınlamak, yeni SW etkinleştiğinde eski önbellekleri siliyor. Yeni SW beklemeden devreye giriyor (`skipWaiting` + `clients.claim`).
+**Sürüm yönetimi:** Dosyanın başındaki `VERSION` değeri (şu an `v2`) önbellek adlarının parçası. Değeri artırıp yayınlamak, yeni SW etkinleştiğinde eski önbellekleri siliyor. Yeni SW beklemeden devreye giriyor (`skipWaiting` + `clients.claim`).
 
 **Kayıt:** `frontend/src/components/pwa/ServiceWorkerRegister.tsx`, kök layout'ta.
 - Yalnızca **üretim derlemesinde** kaydediliyor ve sayfa yüklendikten sonra devreye giriyor, ilk boyamayı yavaşlatmıyor.
@@ -81,6 +81,9 @@ Simge değiştirilecekse yalnızca `icon.svg` düzenlenip `npm run icons` çalı
 - "Bağlantı yok" başlığı, kısa bir açıklama ve **Tekrar dene** düğmesi.
 - Bağlantı geri geldiğinde sayfa kendiliğinden yenileniyor (`online` olayı).
 - Bilerek `(shop)` grubunun **dışında**: o kabuk her istekte API'den salon bilgisi çekiyor. Bu sayfada hiçbir veri çağrısı yok, statik üretiliyor ve SW kurulurken önbelleğe alınıyor.
+- SW kurulurken sayfanın yalnızca HTML'i değil, kullandığı JS ve CSS dosyaları da önbelleğe alınıyor. Dosya adları her derlemede değiştiği için liste elle tutulmuyor; önbelleğe alınan HTML'in içinden okunuyor.
+
+> **Bilgisayarda denemede bulunan hata (düzeltildi):** İlk sürümde (`v1`) yalnızca `/offline` HTML'i önbelleğe alınıyordu. Çevrimdışıyken sayfanın JS dosyası yüklenemediği için "Bağlantı yok" yerine `Application error: a client-side exception` (`ChunkLoadError`) görünüyordu. Düzeltmeyle birlikte `VERSION` `v2`'ye yükseltildi; daha önce `v1` kurulmuş tarayıcılar bir sonraki ziyarette yeni sürümü alıp eski önbellekleri siliyor.
 
 ### 5. "Ana ekrana ekle" önerisi
 
@@ -167,6 +170,12 @@ Masaüstünde ve çentiksiz cihazlarda güvenli alan değeri 0 olduğu için gö
   - Tüm simgeler 200 dönüyor.
   - Sayfada manifest, `apple-touch-icon` ve `apple-mobile-web-app-*` etiketleri var.
   - `sw.js` doğru `Cache-Control` ve `Content-Type` başlıklarıyla geliyor.
+- **Bilgisayarda Chrome ile denendi:**
+  - Service worker etkinleşti ve sayfayı kontrol ediyor.
+  - Chrome sayfayı yüklenebilir buldu ve "Ana ekrana ekle" kartı göründü.
+  - Sunucu durdurulunca `/randevu` yerine "Bağlantı yok" sayfası açıldı; `/` ve `/portfolyo` önbellekten açıldı.
+  - `v1` → `v2` geçişinde eski önbellekler silindi.
+- **Bilinen sınır:** Çevrimdışı vitrin sayfalarında yalnızca daha önce ekranda görülmüş fotoğraflar çıkar; hiç kaydırılıp görülmemiş görseller önbellekte olmaz.
 - **Henüz yapılmadı:** Gerçek bir telefonda veya tablette yükleme ve çevrimdışı davranış denenmedi (aşağıya bakınız).
 
 ---
