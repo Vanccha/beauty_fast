@@ -91,9 +91,22 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
         </div>
 
         <div className="border-t border-sand-100 py-4">
-          <p className="bleed text-xs text-ink-500">
-            © {new Date().getFullYear()} {branch.salon.name} · {branch.name}
-          </p>
+          <div className="bleed flex flex-col gap-2 text-xs text-ink-500 sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              © {new Date().getFullYear()} {branch.salon.name} · {branch.name}
+            </p>
+            <nav aria-label="Yasal metinler" className="flex flex-wrap gap-x-4 gap-y-1">
+              <Link href="/kvkk" className="hover:text-plum-700">
+                KVKK Aydınlatma Metni
+              </Link>
+              <Link href="/acik-riza" className="hover:text-plum-700">
+                Açık Rıza Metinleri
+              </Link>
+              <Link href="/cerez-politikasi" className="hover:text-plum-700">
+                Çerez Politikası
+              </Link>
+            </nav>
+          </div>
         </div>
       </footer>
 

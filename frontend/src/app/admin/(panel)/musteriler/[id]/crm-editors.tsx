@@ -31,17 +31,26 @@ function useAction() {
 
 /* ------------------------------------------------------------------ */
 
+/**
+ * KVKK m.6: alerji sağlık verisidir. Müşterinin ilk alerji kaydında
+ * personel açık rızayı aldığını işaretlemek zorundadır; sunucu da aynı
+ * kuralı uygular (`CONSENT_REQUIRED`). Rıza bir kez kaydedildikten sonra
+ * kutu gösterilmez.
+ */
 export function AllergyEditor({
   customerId,
   allergies,
+  healthConsent,
 }: {
   customerId: number;
   allergies: { id: number; label: string }[];
+  healthConsent: boolean;
 }) {
   const { busy, error, run } = useAction();
   const [label, setLabel] = useState('');
   const [severity, setSeverity] = useState<'LOW' | 'MEDIUM' | 'HIGH'>('HIGH');
   const [note, setNote] = useState('');
+  const [consent, setConsent] = useState(false);
   const [open, setOpen] = useState(false);
 
   if (!open) {
@@ -82,11 +91,13 @@ export function AllergyEditor({
             label,
             severity,
             note: note || undefined,
+            consentConfirmed: consent,
           }),
         );
         if (okay) {
           setLabel('');
           setNote('');
+          setConsent(false);
           setOpen(false);
         }
       }}
@@ -113,12 +124,29 @@ export function AllergyEditor({
         onChange={(e) => setNote(e.target.value)}
         placeholder="Uygulama notu (isteğe bağlı)"
       />
+      {!healthConsent && (
+        <label className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-5 w-5 shrink-0 accent-plum-600"
+            checked={consent}
+            onChange={(e) => setConsent(e.target.checked)}
+          />
+          <span>
+            Müşteriye{' '}
+            <a href="/acik-riza#saglik" target="_blank" className="font-semibold underline">
+              sağlık verisi açık rıza metnini
+            </a>{' '}
+            okuttum ve alerji bilgisinin kaydedilmesine <strong>açık rıza verdi</strong>.
+          </span>
+        </label>
+      )}
       {error && <p className="text-sm text-rose-600">{error}</p>}
       <div className="flex gap-2">
         <button type="button" className="btn-secondary flex-1" onClick={() => setOpen(false)}>
           Vazgeç
         </button>
-        <button className="btn-primary flex-1" disabled={busy}>
+        <button className="btn-primary flex-1" disabled={busy || (!healthConsent && !consent)}>
           Kaydet
         </button>
       </div>

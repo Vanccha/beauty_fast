@@ -295,6 +295,18 @@ class Customer(Base):
     #: Engagement modulu tercihi (kullanici kapatabilir)
     engagement_opt_in: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    # --- KVKK (bkz. services/privacy.py) -----------------------------
+    #: Ticari elektronik ileti onayi ("bakim zamanin geldi" tekrar
+    #: hatirlatmalari). None = onay yok; bu musteriye tekrar hatirlatmasi
+    #: kuyruga alinmaz ve kuyruktaki varsa gonderilmez.
+    marketing_consent_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+    #: KVKK m.6 - alerji (saglik verisi) kaydi icin acik riza zamani.
+    #: Riza geri alinirsa alerji kayitlari silinir ve alan bosaltilir.
+    health_consent_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+    #: Hesap silme talebiyle anonimlestirildiyse zamani (satir silinmez:
+    #: randevu ve doluluk istatistikleri kimliksiz olarak korunur).
+    anonymized_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 

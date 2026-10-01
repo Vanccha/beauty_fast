@@ -18,6 +18,10 @@ interface CustomerCard {
     email: string | null;
     birthDate: string | null;
     engagementOptIn: boolean;
+    /** KVKK: ticari ileti (tekrar hatırlatması) onayı */
+    marketingConsent: boolean;
+    /** KVKK m.6: alerji kaydı için açık rıza */
+    healthConsent: boolean;
     loyaltyPoints: number;
     tier: string;
     tierProgress: {
@@ -152,6 +156,12 @@ export default async function CustomerCardPage({
               <span className={`badge ${RISK_TONE[profile.risk.label] ?? RISK_TONE.YETERSIZ_VERI}`}>
                 Risk: {profile.risk.label} ({profile.risk.score}/100)
               </span>
+              <span
+                className={`badge ${profile.marketingConsent ? 'bg-emerald-50 text-emerald-700' : 'bg-sand-100 text-ink-500'}`}
+                title="Tekrar hatırlatmaları yalnızca onaylı müşterilere gönderilir"
+              >
+                {profile.marketingConsent ? 'İleti onayı var' : 'İleti onayı yok'}
+              </span>
             </div>
             {profile.segment.warning && (
               <p className="mt-2 text-sm text-amber-800">{profile.segment.warning}</p>
@@ -189,7 +199,11 @@ export default async function CustomerCardPage({
             ))}
           </ul>
         )}
-        <AllergyEditor customerId={customerId} allergies={allergies} />
+        <AllergyEditor
+          customerId={customerId}
+          allergies={allergies}
+          healthConsent={profile.healthConsent}
+        />
       </section>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

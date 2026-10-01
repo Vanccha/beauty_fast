@@ -33,7 +33,9 @@ from ..core.risk_score import normalize_phone
 from ..deps import DbSession
 from ..errors import AppError
 from ..http import EnvelopeRoute
-from ..models import Staff
+from ..models import Customer, Staff
+from ..services.privacy import set_marketing_consent
+from ..time_utils import now_local
 
 router = APIRouter(prefix="/api/auth", tags=["auth"], route_class=EnvelopeRoute)
 
@@ -60,6 +62,10 @@ class OtpVerifyBody(BaseModel):
     code: str = Field(min_length=4, max_length=8)
     firstName: str | None = Field(default=None, max_length=60)
     lastName: str | None = Field(default=None, max_length=60)
+    #: Giris formundaki ISTEGE BAGLI ticari ileti onay kutusu. Yalnizca
+    #: ``True`` islenir: girişte isaretlenmemesi mevcut onayi geri almaz
+    #: (geri alma Hesabim > Gizlilik'ten yapilir).
+    marketingConsent: bool = False
 
 
 @router.post("/otp/verify")
@@ -67,14 +73,17 @@ def otp_verify(body: OtpVerifyBody, request: Request, response: Response, db: Db
     verified = verify_otp(
         db, body.phone, body.code, body.firstName, body.lastName, ip=client_ip(request)
     )
+    if body.marketingConsent:
+        customer_row = db.get(Customer, verified.customer_id)
+        set_marketing_consent(db, customer_row, True, now_local())
+        db.commit()
+
     create_customer_session(db, response, verified.customer_id)
     principal = get_customer_principal(db, request)
 
     # Cerez bu yanitla yazildigi icin principal'i dogrudan okuyamayabiliriz;
     # bu durumda tazeledigimiz kimligi elle kurariz.
     if principal is None:
-        from ..models import Customer
-
         customer = db.get(Customer, verified.customer_id)
         payload = {
             "id": customer.id,

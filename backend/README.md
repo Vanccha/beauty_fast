@@ -84,7 +84,7 @@ kod sabittir.
 |---|---|
 | `uvicorn app.main:app --reload` | Geliştirme sunucusu |
 | `python -m app.seed` | Demo verisini yeniden üretir (deterministik) |
-| `pytest` | 190 testin tamamı (Docker'daki `aurora_test` veritabanında) |
+| `pytest` | 201 testin tamamı (Docker'daki `aurora_test` veritabanında) |
 | `alembic upgrade head` | Şemayı en güncel migration'a getirir (üretimde dağıtım adımı) |
 | `alembic revision --autogenerate -m "..."` | Model değişikliğinden yeni migration üretir |
 | `pytest tests/test_concurrency.py` | Yalnızca yarış koşulu testleri |
@@ -652,7 +652,7 @@ durum değeri eklemek migration gerektirmez).
 ## Testler
 
 ```bash
-pytest                        # 190 test
+pytest                        # 201 test
 pytest tests/test_concurrency.py
 ```
 
@@ -670,6 +670,7 @@ pytest tests/test_concurrency.py
 | `test_api` | uçtan uca API: zarf, yetki kapıları, randevu akışı, yorum kapıları |
 | `test_admin_views` | ★ panel sayfalarının beslendiği uçlar: bildirim kuyruğu, galeri listesi, fırsat saati bayrakları, kampanya hedef kitlesi, hatırlatma örnek önizlemesi |
 | `test_whatsapp_welcome` | ★ İlk mesajda karşılama: tek sefer garantisi, tanıdık kişi kuralları (OTP/hatırlatma/personel/geçmiş), `@lid`, gruplar, eski mesajlar, panel ayarları |
+| `test_kvkk` | KVKK: ileti onayı yalnızca açıkça verilince, onaysıza tekrar hatırlatması yok, alerji kaydında rıza kapısı, veri dökümü, hesap silmede anonimleştirme, saklama süresi temizliği |
 | `test_messaging` | ★ Evolution istemcisi (sahte sunucu), OTP'nin WhatsApp'tan gönderimi, bağlantı kopukken hızlı hata, kuyrukta yeniden deneme/geri çekilme, yarım kalan gönderimin kurtarılması |
 | `test_security` | ★ OTP kaba kuvvet koruması, deneme sınırları, bakım ucu yetkisi, üretim yapılandırma doğrulaması, saat dilimi |
 | `test_booking_login_resume` | ★ misafir kilidi girişten sonra da geçerli (`viewer_key` değişmez), kilit sahipliği üye bazında korunur, `CUSTOMER_OVERLAP`, istemcinin gönderdiği `shadowParentId` doğrulanmadan kaydedilmez |

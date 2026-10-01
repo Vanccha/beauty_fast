@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -17,6 +18,10 @@ interface SendResult {
  * `devCode` yalnızca geliştirmede döner (`NODE_ENV !== 'production'`);
  * varsa kutuya otomatik yazılır ki demo sırasında konsola bakmaya gerek
  * kalmasın.
+ *
+ * KVKK: aydınlatma metni bağlantısı numara girilirken gösterilir (veri
+ * toplanmadan önce). Ticari ileti onayı AYRI ve İSTEĞE BAĞLI bir kutudur,
+ * varsayılan olarak işaretsizdir; girişin şartı değildir.
  */
 export function LoginForm({ nextUrl }: { nextUrl: string }) {
   const router = useRouter();
@@ -25,6 +30,7 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [firstName, setFirstName] = useState('');
+  const [marketingConsent, setMarketingConsent] = useState(false);
   const [needsName, setNeedsName] = useState(false);
   const [sent, setSent] = useState<SendResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +77,7 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
         phone,
         code,
         firstName: firstName || undefined,
+        marketingConsent,
       });
 
       // Yeni üye adını girmediyse önce adını iste, sonra devam et.
@@ -91,7 +98,7 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
     event.preventDefault();
     setBusy(true);
     try {
-      await apiSend('/api/auth/otp/verify', 'POST', { phone, code, firstName });
+      await apiSend('/api/auth/otp/verify', 'POST', { phone, code, firstName, marketingConsent });
       router.push(nextUrl);
       router.refresh();
     } catch {
@@ -204,11 +211,39 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
         />
       </div>
 
+      <label className="flex items-start gap-3 text-sm text-ink-700">
+        <input
+          type="checkbox"
+          className="mt-0.5 h-5 w-5 shrink-0 accent-plum-600"
+          checked={marketingConsent}
+          onChange={(e) => setMarketingConsent(e.target.checked)}
+        />
+        <span>
+          Bakım zamanı hatırlatmaları ve kampanyalar için WhatsApp ile ileti almak istiyorum.{' '}
+          <span className="text-ink-500">
+            (İsteğe bağlı ·{' '}
+            <Link href="/acik-riza#ticari-ileti" target="_blank" className="underline">
+              Onay metni
+            </Link>
+            )
+          </span>
+        </span>
+      </label>
+
       {error && <p className="text-sm text-rose-600">{error}</p>}
 
       <button className="btn-primary w-full" disabled={busy || phone.replace(/\D/g, '').length < 10}>
         Kod gönder
       </button>
+
+      <p className="text-xs leading-relaxed text-ink-500">
+        Giriş için telefon numaran ve adın işlenir; doğrulama kodu WhatsApp ile gönderilir.
+        Ayrıntılar:{' '}
+        <Link href="/kvkk" target="_blank" className="underline">
+          KVKK Aydınlatma Metni
+        </Link>
+        .
+      </p>
     </form>
   );
 }
