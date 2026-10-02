@@ -22,7 +22,7 @@ export function SweepButton({ pendingDue }: { pendingDue: number }) {
     <div className="text-right">
       <button
         type="button"
-        className="btn-primary"
+        className="btn-primary btn-sm"
         disabled={busy}
         onClick={async () => {
           setBusy(true);

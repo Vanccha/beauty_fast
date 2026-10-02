@@ -1,5 +1,6 @@
 'use client';
 
+import { Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -58,7 +59,7 @@ export function PortfolioManager({
 
   return (
     <>
-      <form onSubmit={upload} className="card grid grid-cols-1 gap-2 md:grid-cols-2">
+      <form onSubmit={upload} className="card grid grid-cols-1 gap-2 !p-3 md:grid-cols-2">
         <input
           type="file"
           accept="image/jpeg,image/png,image/webp"
@@ -94,15 +95,15 @@ export function PortfolioManager({
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Açıklama (isteğe bağlı)"
         />
-        {error && <p className="text-sm text-rose-600 md:col-span-2">{error}</p>}
-        <button className="btn-primary md:col-span-2" disabled={busy || !file || !title}>
+        {error && <p className="text-sm text-danger-700 md:col-span-2">{error}</p>}
+        <button className="btn-primary btn-sm md:col-span-2" disabled={busy || !file || !title}>
           {busy ? 'Yükleniyor…' : 'Galeriye ekle'}
         </button>
       </form>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         {items.map((item) => (
-          <figure key={item.id} className="overflow-hidden rounded-2xl border border-sand-200 bg-white">
+          <figure key={item.id} className="overflow-hidden rounded-[4px] border border-sand-200 bg-white">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={item.imageUrl}
@@ -110,21 +111,21 @@ export function PortfolioManager({
               loading="lazy"
               className="aspect-square w-full object-cover"
             />
-            <figcaption className="space-y-1 p-2">
-              <p className="truncate text-sm font-medium">{item.title}</p>
-              <p className="muted">
+            <figcaption className="space-y-0.5 p-2">
+              <p className="truncate text-sm font-medium text-ink-900">{item.title}</p>
+              <p className="muted truncate text-xs">
                 {item.categoryName ?? '—'}
                 {item.staffName ? ` · ${item.staffName}` : ''}
               </p>
               <button
                 type="button"
-                className="btn-ghost w-full text-sm text-rose-600"
+                className="btn-ghost btn-sm w-full text-rose-700"
                 onClick={async () => {
                   await apiSend(`/api/admin/portfolio?id=${item.id}`, 'DELETE').catch(() => undefined);
                   router.refresh();
                 }}
               >
-                Kaldır
+                <Trash2 size={14} strokeWidth={1.5} aria-hidden /> Kaldır
               </button>
             </figcaption>
           </figure>

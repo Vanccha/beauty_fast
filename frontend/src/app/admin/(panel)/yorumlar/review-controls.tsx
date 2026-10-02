@@ -1,5 +1,6 @@
 'use client';
 
+import { Star } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -44,11 +45,11 @@ export function ReviewControls({
   }
 
   return (
-    <div className="mt-3 space-y-2 border-t border-sand-100 pt-3">
-      <div className="flex flex-wrap gap-2">
+    <div className="mt-3 space-y-2 border-t border-sand-200 pt-3">
+      <div className="flex flex-wrap gap-1.5">
         <button
           type="button"
-          className="btn-secondary text-sm"
+          className="btn-secondary btn-sm"
           disabled={busy}
           onClick={() => void patch({ isPublished: !isPublished })}
         >
@@ -57,15 +58,21 @@ export function ReviewControls({
 
         <button
           type="button"
-          className={isFeatured ? 'btn-secondary text-sm' : 'btn-ghost text-sm'}
+          className={isFeatured ? 'btn-secondary btn-sm' : 'btn-ghost btn-sm'}
           disabled={busy}
           onClick={() => void patch({ isFeatured: !isFeatured })}
         >
-          {isFeatured ? '★ Öne çıkarıldı' : '☆ Öne çıkar'}
+          <Star
+            size={14}
+            strokeWidth={1.5}
+            fill={isFeatured ? 'currentColor' : 'none'}
+            aria-hidden
+          />
+          {isFeatured ? 'Öne çıkarıldı' : 'Öne çıkar'}
         </button>
 
         {!editing && (
-          <button type="button" className="btn-ghost text-sm" onClick={() => setEditing(true)}>
+          <button type="button" className="btn-ghost btn-sm" onClick={() => setEditing(true)}>
             {reply ? 'Yanıtı düzenle' : 'Yanıtla'}
           </button>
         )}
@@ -83,7 +90,7 @@ export function ReviewControls({
           <div className="flex gap-2">
             <button
               type="button"
-              className="btn-secondary flex-1 text-sm"
+              className="btn-secondary btn-sm flex-1"
               onClick={() => {
                 setDraft(reply ?? '');
                 setEditing(false);
@@ -93,7 +100,7 @@ export function ReviewControls({
             </button>
             <button
               type="button"
-              className="btn-primary flex-1 text-sm"
+              className="btn-primary btn-sm flex-1"
               disabled={busy}
               onClick={() => void patch({ reply: draft.trim() })}
             >
@@ -103,7 +110,7 @@ export function ReviewControls({
         </div>
       )}
 
-      {error && <p className="text-xs text-rose-600">{error}</p>}
+      {error && <p className="text-xs text-danger-700">{error}</p>}
     </div>
   );
 }

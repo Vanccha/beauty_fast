@@ -1,4 +1,4 @@
-import { CalendarDays, House, Images, CalendarSearch } from 'lucide-react';
+import { House, Images, MessageSquareQuote, Users } from 'lucide-react';
 import Link from 'next/link';
 
 import { serverApi, type MeResponse, type SalonInfo } from '@/lib/server-api';
@@ -31,20 +31,18 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
 
   const links = [
     { href: '/', label: 'Ana Sayfa', icon: <House size={20} strokeWidth={1.5} /> },
-    { href: '/randevu', label: 'Randevu', icon: <CalendarDays size={20} strokeWidth={1.5} /> },
-    { href: '/portfolyo', label: 'Portfolyo', icon: <Images size={20} strokeWidth={1.5} /> },
-    { href: '/randevularim', label: 'Randevularım', icon: <CalendarSearch size={20} strokeWidth={1.5} /> },
+    // Portfolyo, yorumlar ve ekip ana sayfadaki bölümlerdir (tek sayfa düzeni).
+    { href: '/#portfolyo', label: 'Portfolyo', icon: <Images size={20} strokeWidth={1.5} /> },
+    { href: '/#yorumlar', label: 'Yorumlar', icon: <MessageSquareQuote size={20} strokeWidth={1.5} /> },
+    { href: '/#ekip', label: 'Ekibimiz', icon: <Users size={20} strokeWidth={1.5} /> },
   ];
-
-  // Üst barda gösterilen ama alt çubuğa sığmayan ek sayfalar.
-  const secondaryLinks = [{ href: '/yorumlar', label: 'Yorumlar' }];
 
   return (
     <div className="flex min-h-dvh w-full flex-col">
       <SiteHeader
         salonName={branch.salon.name}
         customerName={customer?.firstName ?? null}
-        links={[...links, ...secondaryLinks]}
+        links={links.map(({ href, label }) => ({ href, label }))}
       />
 
       <main className="flex-1">{children}</main>
@@ -68,7 +66,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
           <nav aria-label="Alt gezinme">
             <p className="eyebrow !text-brass-300">Sayfalar</p>
             <ul className="mt-4 space-y-2.5">
-              {[...links, ...secondaryLinks].map((l) => (
+              {links.map((l) => (
                 <li key={l.href}>
                   <Link href={l.href} className="text-sm text-sand-200/80 transition-colors hover:text-sand-50">
                     {l.label}

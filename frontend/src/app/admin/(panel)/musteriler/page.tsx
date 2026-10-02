@@ -1,3 +1,4 @@
+import { Search } from 'lucide-react';
 import Link from 'next/link';
 
 import { formatTl } from '@/lib/api-client';
@@ -29,12 +30,12 @@ interface CustomerSummary {
 const SEGMENTS = ['hepsi', 'VIP', 'SADIK', 'RISKLI', 'UYUYAN', 'YENI', 'STANDART'] as const;
 
 const TONE_CLASS: Record<string, string> = {
-  violet: 'bg-violet-50 text-violet-700',
-  emerald: 'bg-emerald-50 text-emerald-700',
-  red: 'bg-rose-50 text-rose-700',
-  amber: 'bg-amber-50 text-amber-800',
-  sky: 'bg-sky-50 text-sky-700',
-  slate: 'bg-sand-100 text-ink-700',
+  violet: 'border border-plum-300 bg-transparent text-plum-700',
+  emerald: 'border border-emerald-300 bg-transparent text-emerald-700',
+  red: 'border border-rose-300 bg-transparent text-rose-700',
+  amber: 'border border-brass-300 bg-transparent text-brass-700',
+  sky: 'border border-sand-300 bg-transparent text-ink-700',
+  slate: 'border border-sand-200 bg-sand-100 text-ink-700',
 };
 
 /**
@@ -61,30 +62,29 @@ export default async function CustomersPage({
   );
 
   return (
-    <div className="space-y-4">
-      <h1 className="section-title">Müşteriler ({rows.length})</h1>
-
+    <div className="space-y-3">
       <form className="flex gap-2" action="/admin/musteriler">
         <input
           name="q"
           defaultValue={q ?? ''}
-          className="field"
+          className="field !min-h-10"
           placeholder="Ad veya telefon ara"
           aria-label="Müşteri ara"
         />
         {segment && <input type="hidden" name="segment" value={segment} />}
-        <button className="btn-primary">Ara</button>
+        <button className="btn-primary btn-sm">
+          <Search size={14} strokeWidth={1.5} aria-hidden /> Ara
+        </button>
       </form>
 
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        <span className="eyebrow mr-1 shrink-0 tabular-nums">{rows.length} kişi</span>
         {SEGMENTS.map((s) => (
           <Link
             key={s}
             href={`/admin/musteriler?segment=${s}${q ? `&q=${encodeURIComponent(q)}` : ''}`}
-            className={`btn shrink-0 ${
-              (segment ?? 'hepsi') === s
-                ? 'bg-plum-600 text-white'
-                : 'border border-sand-300 bg-white'
+            className={`chip !min-h-8 shrink-0 !px-3 text-xs ${
+              (segment ?? 'hepsi') === s ? 'chip-active chip-primary' : ''
             }`}
           >
             {s === 'hepsi' ? 'Hepsi' : s}
@@ -92,18 +92,18 @@ export default async function CustomersPage({
         ))}
       </div>
 
-      <ul className="space-y-2">
+      <ul className="space-y-1.5">
         {rows.map((c) => (
           <li key={c.id}>
             <Link
               href={`/admin/musteriler/${c.id}`}
-              className="card flex flex-wrap items-center justify-between gap-3 hover:border-plum-300"
+              className="card flex flex-wrap items-center justify-between gap-x-3 gap-y-2 !p-3 hover:border-ink-900"
             >
               <div className="min-w-0">
-                <p className="font-medium">
+                <p className="text-sm font-medium text-ink-900">
                   {c.firstName} {c.lastName ?? ''}
                 </p>
-                <p className="muted">
+                <p className="muted text-xs tabular-nums">
                   0{c.phone} · {c.visitCount} ziyaret
                   {c.lastVisitDaysAgo !== null && ` · son ${c.lastVisitDaysAgo} gün önce`}
                 </p>
@@ -113,13 +113,13 @@ export default async function CustomersPage({
                 <span className={`badge ${TONE_CLASS[c.segment.tone] ?? TONE_CLASS.slate}`}>
                   {c.segment.badge}
                 </span>
-                <span className="badge bg-sand-100 text-ink-700">{c.tier}</span>
+                <span className="badge border border-sand-200 bg-sand-100 text-ink-700">{c.tier}</span>
                 {c.noShowCount > 0 && (
-                  <span className="badge bg-rose-50 text-rose-700">
+                  <span className="badge border border-rose-300 bg-transparent text-rose-700">
                     {c.noShowCount} gelmedi
                   </span>
                 )}
-                <span className="font-semibold">{formatTl(c.totalSpend)}</span>
+                <span className="text-sm font-semibold tabular-nums">{formatTl(c.totalSpend)}</span>
               </div>
             </Link>
           </li>

@@ -53,13 +53,13 @@ export function StockRow({ item }: { item: StockItem }) {
   }
 
   return (
-    <article className={`card ${item.isCritical ? 'border-rose-300 bg-rose-50' : ''}`}>
+    <article className={`card !p-3 ${item.isCritical ? 'border-rose-300' : ''}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-medium">
+          <p className="text-sm font-medium text-ink-900">
             {item.name}
             {item.isCritical && (
-              <span className="badge ml-2 bg-rose-100 text-rose-700">kritik</span>
+              <span className="badge ml-2 border border-rose-300 bg-transparent text-rose-700">kritik</span>
             )}
           </p>
           <p className="muted">
@@ -69,19 +69,19 @@ export function StockRow({ item }: { item: StockItem }) {
 
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <p className="text-lg font-semibold tabular-nums">
+            <p className="text-base font-semibold tabular-nums">
               {item.quantity} <span className="text-sm font-normal">{item.unit}</span>
             </p>
-            <p className="muted">kritik: {item.criticalLevel}</p>
+            <p className="muted text-xs">kritik: {item.criticalLevel}</p>
           </div>
-          <button type="button" className="btn-secondary" onClick={() => setOpen((v) => !v)}>
+          <button type="button" className="btn-secondary btn-sm" onClick={() => setOpen((v) => !v)}>
             {open ? 'Kapat' : 'Düzenle'}
           </button>
         </div>
       </div>
 
       {open && (
-        <form onSubmit={submit} className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-4">
+        <form onSubmit={submit} className="mt-3 border-t border-sand-200 pt-3 grid grid-cols-1 gap-2 md:grid-cols-4">
           <input
             className="field"
             inputMode="decimal"
@@ -105,11 +105,11 @@ export function StockRow({ item }: { item: StockItem }) {
             onChange={(e) => setCritical(e.target.value)}
             placeholder="Kritik seviye"
           />
-          <button className="btn-primary" disabled={busy}>
+          <button className="btn-primary btn-sm" disabled={busy}>
             {busy ? 'Kaydediliyor…' : 'Kaydet'}
           </button>
 
-          {error && <p className="text-sm text-rose-600 md:col-span-4">{error}</p>}
+          {error && <p className="text-sm text-danger-700 md:col-span-4">{error}</p>}
 
           {item.recentMovements.length > 0 && (
             <ul className="muted md:col-span-4">

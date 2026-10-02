@@ -29,7 +29,7 @@ export function StaffLoginForm() {
   }
 
   return (
-    <form onSubmit={submit} className="card space-y-3">
+    <form onSubmit={submit} className="card space-y-4 !p-5">
       <div>
         <label className="label" htmlFor="phone">
           Telefon
@@ -62,7 +62,7 @@ export function StaffLoginForm() {
         />
       </div>
 
-      {error && <p className="text-sm text-rose-600">{error}</p>}
+      {error && <p className="text-sm text-danger-700" role="alert">{error}</p>}
 
       <button className="btn-primary w-full" disabled={busy}>
         {busy ? 'Giriş yapılıyor…' : 'Giriş yap'}

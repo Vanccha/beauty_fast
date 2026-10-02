@@ -1,3 +1,5 @@
+import { AlertTriangle } from 'lucide-react';
+
 import { adminApi } from '@/lib/admin-api';
 import { formatTl } from '@/lib/api-client';
 import { StockRow } from './stock-row';
@@ -42,24 +44,22 @@ export default async function StockPage() {
   const totalValue = items.reduce((sum, i) => sum + i.quantity * (i.costPerUnit ?? 0), 0);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="section-title">Stok</h1>
-        <p className="muted">Tahmini stok değeri: {formatTl(totalValue)}</p>
-      </div>
+    <div className="space-y-3">
+      <p className="muted tabular-nums">Tahmini stok değeri: {formatTl(totalValue)}</p>
 
       {critical.length > 0 && (
-        <div className="rounded-2xl border-2 border-rose-300 bg-rose-50 p-4">
-          <h2 className="font-semibold text-rose-800">
-            ⚠️ {critical.length} kalem kritik seviyede
+        <div className="rounded-[4px] border border-rose-300 px-3 py-2.5">
+          <h2 className="eyebrow flex items-center gap-1.5 !text-rose-700">
+            <AlertTriangle size={14} strokeWidth={1.5} aria-hidden />
+            {critical.length} kalem kritik seviyede
           </h2>
-          <p className="mt-1 text-sm text-rose-700">
+          <p className="mt-1 text-sm text-ink-700">
             {critical.map((c) => `${c.name} (${c.quantity} ${c.unit})`).join(' · ')}
           </p>
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {items.map((item) => (
           <StockRow
             key={item.id}

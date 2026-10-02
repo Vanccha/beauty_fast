@@ -6,6 +6,7 @@ import { CalendarSearch } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { SiteInstallButton } from '@/components/pwa/InstallButton';
+import { isLinkActive, useActiveSection } from './use-active-section';
 
 /**
  * Üst bar.
@@ -29,6 +30,7 @@ export function SiteHeader({
 }) {
   const pathname = usePathname();
   const isHome = pathname === '/';
+  const section = useActiveSection();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -59,8 +61,7 @@ export function SiteHeader({
 
         <nav className="hidden items-center gap-5 lg:flex xl:gap-7">
           {links.map((link) => {
-            const active =
-              link.href === '/' ? pathname === '/' : pathname === link.href || pathname.startsWith(`${link.href}/`);
+            const active = isLinkActive(link.href, pathname, section);
             return (
               <Link
                 key={link.href}
@@ -90,7 +91,7 @@ export function SiteHeader({
           <Link
             href="/randevularim"
             aria-label="Randevu Sorgula"
-            className={`touch-target hidden items-center justify-center gap-2 rounded-[2px] px-3 text-xs font-semibold uppercase tracking-[0.14em] whitespace-nowrap transition-colors md:inline-flex ${
+            className={`touch-target inline-flex items-center justify-center gap-2 rounded-[2px] px-3 text-xs font-semibold uppercase tracking-[0.14em] whitespace-nowrap transition-colors ${
               transparent ? 'text-white hover:bg-white/15' : 'text-ink-700 hover:bg-sand-100'
             }`}
           >

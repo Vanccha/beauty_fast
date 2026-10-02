@@ -25,9 +25,7 @@ export default async function AdminPortfolioPage() {
   const { items, categories, staff } = await adminApi<AdminPortfolioResponse>('/api/admin/portfolio');
 
   return (
-    <div className="space-y-4">
-      <h1 className="section-title">Portfolyo</h1>
-
+    <div className="space-y-3">
       <PortfolioManager
         categories={categories}
         staff={staff}

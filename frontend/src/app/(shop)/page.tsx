@@ -1,7 +1,8 @@
 import { ArrowRight, Clock, Droplets, FlaskConical, Plus, Sparkles, Star } from 'lucide-react';
 import Link from 'next/link';
 
-import { ReviewCard } from '@/components/marketing/ReviewCard';
+import { PortfolioGallery, type PortfolioCategory, type PortfolioItem } from '@/components/marketing/PortfolioGallery';
+import { ReviewsBrowser } from '@/components/marketing/ReviewsBrowser';
 import { Stars } from '@/components/marketing/Stars';
 import { durationLabel, formatTl } from '@/lib/api-client';
 import { resolveHeroImage } from '@/lib/hero-image';
@@ -62,13 +63,18 @@ interface Showcase {
     rating: { average: number; count: number } | null;
     specialties: string[];
   }[];
-  portfolio: {
-    id: number;
-    title: string;
-    description: string | null;
-    imageUrl: string;
-    categoryId: number | null;
-  }[];
+}
+
+/** `GET /api/portfolio` yanıtı — kategori çipleri ve kategori/usta bilgili işler. */
+interface PortfolioResponse {
+  categories: PortfolioCategory[];
+  items: PortfolioItem[];
+}
+
+/** `GET /api/reviews` yanıtı — özet her zaman tüm yorumları kapsar. */
+interface ReviewsResponse {
+  summary: ReviewSummary;
+  items: PublicReview[];
 }
 
 /**
@@ -83,17 +89,17 @@ interface Showcase {
  *   1. Kahraman        — tam ekran fotoğraf, tek cümlelik vaat
  *   2. Güven şeridi    — gerçek sayılar (uydurma değil, DB'den)
  *   3. Kategoriler     — "ne yaptırmak istersin?"
- *   4. Kalite sözü     — işi nasıl yaptığımız
- *   5. Hizmetler       — vitrin hizmetleri, süre ve fiyatla
- *   6. Yorumlar        — sosyal kanıt (Review tablosu)
+ *   4. Hizmetler       — vitrin hizmetleri, süre ve fiyatla
+ *   5. Portfolyo       — yapılmış işler (`#portfolyo`, sayfada filtrelenir)
+ *   6. Yorumlar        — sosyal kanıt (`#yorumlar`, Review tablosu)
  *   7. Ekip            — arkasındaki insanlar
- *   8. Galeri          — yapılmış işler
+ *   8. Kalite sözü     — işi nasıl yaptığımız (kısa)
  *   9. Ziyaret         — saatler, adres, telefon
  *  10. SSS + kapanış çağrısı
  *
  * DÜRÜSTLÜK KURALI: sayfadaki her rakam veritabanından sayılır. Yorum
- * yoksa yorum bölümü, iş yoksa galeri bölümü hiç render edilmez —
- * boş bir vitrin, sahte bir vitrinden iyidir.
+ * ve iş yoksa bölümler boş durum metni gösterir (bağlantı kopmasın);
+ * uydurma içerik konmaz.
  *
  * Üye girişi varsa kahraman metni kişiselleştirilir; metin uydurulmaz,
  * son tamamlanmış randevu ve o hizmetin `recommendedRepeatDays`
@@ -101,18 +107,20 @@ interface Showcase {
  */
 export default async function HomePage() {
   // Veri FastAPI backend'inden gelir; bu sayfa veritabanını bilmez.
-  const [showcase, me] = await Promise.all([
+  const [showcase, me, portfolioData, reviewsData] = await Promise.all([
     serverApi<Showcase>('/api/showcase'),
     serverApi<MeResponse>('/api/me'),
+    serverApi<PortfolioResponse>('/api/portfolio'),
+    // Tüm yorumlar, tarih sırasıyla (eski /yorumlar sayfasındaki liste).
+    serverApi<ReviewsResponse>('/api/reviews'),
   ]);
 
   const welcome = me.welcome;
   const stats = showcase.stats;
   const openingHours = showcase.openingHours;
-  const portfolio = showcase.portfolio;
   const staff = showcase.team;
-  const reviews = showcase.reviews.items;
-  const reviewSummary = showcase.reviews.summary;
+  const reviewSummary = reviewsData.summary;
+  const reviews = reviewsData.items;
 
   // JSX aynı kalsın diye salon bilgisi eski biçimde paketlenir.
   const branch = {
@@ -140,7 +148,7 @@ export default async function HomePage() {
       {/* ================================================================
           1. KAHRAMAN — sayfa metinle değil, fotoğrafla açılır
           ============================================================ */}
-      <section className="relative flex min-h-[92svh] items-end overflow-hidden md:min-h-[88svh]">
+      <section className="relative flex min-h-[72svh] items-end overflow-hidden md:min-h-[70svh]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={hero.url}
@@ -159,21 +167,21 @@ export default async function HomePage() {
           className="absolute inset-0 bg-gradient-to-b from-ink-900/55 via-ink-900/30 to-ink-900/90"
         />
 
-        <div className="bleed relative pb-12 pt-28 text-white md:pb-16 md:pt-32">
+        <div className="bleed relative pb-8 pt-24 text-white md:pb-10 md:pt-28">
           {welcome ? (
             <>
               <p className="eyebrow !text-brass-300">{branch.salon.name}</p>
-              <h1 className="display mt-4 max-w-3xl text-4xl font-light leading-[1.05] md:text-7xl">
+              <h1 className="display mt-3 max-w-3xl text-3xl font-light leading-[1.08] md:text-6xl">
                 {welcome.headline}
               </h1>
               {welcome.subline && (
-                <p className="mt-4 max-w-xl text-base text-white/85 md:text-lg">
+                <p className="mt-3 max-w-xl text-base text-white/85 md:text-lg">
                   {welcome.subline}
                 </p>
               )}
 
               {welcome.upcoming && (
-                <div className="mt-6 inline-flex flex-wrap items-center gap-2 rounded-[2px] border border-white/25 bg-white/10 px-4 py-3 text-sm backdrop-blur">
+                <div className="mt-5 inline-flex flex-wrap items-center gap-2 rounded-[2px] border border-white/25 bg-white/10 px-4 py-3 text-sm backdrop-blur">
                   <span className="font-semibold">Yaklaşan randevun</span>
                   <span className="text-white/85">
                     {welcome.upcoming.dateLabel} · {minutesToLabel(welcome.upcoming.startMin)} ·{' '}
@@ -182,7 +190,7 @@ export default async function HomePage() {
                 </div>
               )}
 
-              <div className="mt-7 flex flex-wrap gap-3">
+              <div className="mt-5 flex flex-wrap gap-3">
                 {welcome.repeatServiceIds.length > 0 && (
                   <Link
                     href={`/randevu?services=${welcome.repeatServiceIds.join(',')}`}
@@ -199,23 +207,23 @@ export default async function HomePage() {
           ) : (
             <>
               <p className="eyebrow !text-brass-300">Kadıköy · {branch.name}</p>
-              <h1 className="display mt-4 max-w-3xl text-4xl font-light leading-[1.05] md:text-7xl">
+              <h1 className="display mt-3 max-w-3xl text-3xl font-light leading-[1.08] md:text-6xl">
                 Kendine ayırdığın zaman,
                 <br />
                 işini bilen ellerde.
               </h1>
-              <p className="mt-5 max-w-xl text-base leading-relaxed text-white/85 md:text-lg">
+              <p className="mt-4 max-w-xl text-base leading-relaxed text-white/85 md:text-lg">
                 {branch.salon.name} — saç, tırnak, kaş ve cilt bakımında {stats.staffCount} uzman.
                 Uygun saatleri üye olmadan gör; randevu için tek adımlık telefon doğrulaması
                 yeterli.
               </p>
 
-              <div className="mt-8 flex flex-wrap items-center gap-3">
+              <div className="mt-6 flex flex-wrap items-center gap-3">
                 <Link href="/randevu" className="btn-light group">
                   Uygun saatleri gör
                   <ArrowRight size={16} strokeWidth={1.5} aria-hidden className="transition-transform duration-300 group-hover:translate-x-[3px]" />
                 </Link>
-                <Link href="/portfolyo" className="btn-outline-light">
+                <Link href="/#portfolyo" className="btn-outline-light">
                   İşlerimize bak
                 </Link>
               </div>
@@ -226,7 +234,7 @@ export default async function HomePage() {
             Kahramanın altındaki şerit: puan + bugünün saatleri + adres.
             Puan yalnızca gerçek yorum varsa gösterilir.
           */}
-          <dl className="mt-12 flex flex-wrap gap-x-12 gap-y-4 border-t border-white/20 pt-6 text-sm text-white/80">
+          <dl className="mt-7 flex flex-wrap gap-x-10 gap-y-3 border-t border-white/20 pt-4 text-sm text-white/80">
             {reviewSummary.average !== null && (
               <div>
                 <dt className="text-[11px] uppercase tracking-[0.14em] text-white/60">Müşteri puanı</dt>
@@ -257,7 +265,7 @@ export default async function HomePage() {
           2. GÜVEN ŞERİDİ — her rakam veritabanından sayılır
           ============================================================ */}
       <section className="border-b border-sand-200 bg-white">
-        <dl className="bleed grid grid-cols-2 gap-6 py-10 md:grid-cols-4 md:py-14">
+        <dl className="bleed grid grid-cols-2 gap-4 py-6 md:grid-cols-4 md:gap-6 md:py-8">
           {[
             {
               value: stats.completedAppointments.toLocaleString('tr-TR'),
@@ -287,10 +295,10 @@ export default async function HomePage() {
               <div key={item.label}>
                 <dt className="sr-only">{item.label}</dt>
                 <dd>
-                  <span className="display block text-3xl font-light tabular-nums text-plum-700 md:text-5xl">
+                  <span className="display block text-2xl font-light tabular-nums text-plum-700 md:text-4xl">
                     {item.value}
                   </span>
-                  <span className="mt-1 block text-sm text-ink-500">{item.label}</span>
+                  <span className="mt-0.5 block text-xs text-ink-500 md:text-sm">{item.label}</span>
                 </dd>
               </div>
             ))}
@@ -300,22 +308,22 @@ export default async function HomePage() {
       {/* ================================================================
           3. KATEGORİLER
           ============================================================ */}
-      <section className="bleed py-20 md:py-28">
+      <section className="bleed py-12 md:py-16">
         <p className="eyebrow reveal">Hizmetlerimiz</p>
-        <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-          <h2 className="display reveal text-3xl md:text-5xl">Ne yaptırmak istersin?</h2>
+        <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+          <h2 className="display reveal text-2xl md:text-4xl">Ne yaptırmak istersin?</h2>
           <Link href="/randevu" className="btn-link group">
             Tüm hizmetler ve fiyatlar
             <ArrowRight size={16} strokeWidth={1.5} aria-hidden className="transition-transform duration-300 group-hover:translate-x-[3px]" />
           </Link>
         </div>
 
-        <div className="mt-10 grid grid-cols-2 gap-3 md:mt-14 md:grid-cols-4 md:gap-5">
+        <div className="mt-6 grid grid-cols-2 gap-2.5 md:mt-8 md:grid-cols-4 md:gap-4">
           {categoryCards.map((category) => (
             <Link
               key={category.id}
               href={`/randevu?category=${category.slug}`}
-              className="group relative aspect-[3/4] overflow-hidden rounded-[4px] border border-sand-200"
+              className="group relative aspect-[4/3] overflow-hidden rounded-[4px] border border-sand-200 md:aspect-[3/4]"
             >
               {category.cover ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
@@ -335,7 +343,7 @@ export default async function HomePage() {
               />
 
               <div className="absolute inset-x-0 bottom-0 p-3 text-white md:p-4">
-                <p className="display text-lg leading-tight md:text-xl">
+                <p className="display text-base leading-tight md:text-xl">
                   <CategoryIcon slug={category.slug} size={18} className="mr-2 inline-block align-[-2px] text-brass-300" />
                   {category.name}
                 </p>
@@ -350,159 +358,94 @@ export default async function HomePage() {
       </section>
 
       {/* ================================================================
-          4. KALİTE SÖZÜ — "iyi salon" iddiası değil, çalışma biçimi
+          4. VİTRİN HİZMETLERİ — süre ve fiyat açıkça yazılır
           ============================================================ */}
-      <section className="bg-white py-20 md:py-28">
-        <div className="bleed grid gap-12 md:grid-cols-2 md:items-center md:gap-14">
-          <div>
-            <p className="eyebrow">Kalite sözümüz</p>
-            <h2 className="display reveal mt-3 text-3xl md:text-5xl">
-              İyi iş, iyi malzeme ve dürüst bir saat.
-            </h2>
-            <p className="muted mt-4 max-w-lg leading-relaxed">
-              Bir bakım randevusunun en sinir bozucu tarafı belirsizliktir: ne kadar süreceği,
-              ne kadar tutacağı, sıranın ne zaman geleceği. Biz bu üçünü de baştan söylüyoruz.
-            </p>
+      <section className="bg-white py-12 md:py-16">
+        <div className="bleed">
+          <p className="eyebrow reveal">Öne çıkanlar</p>
+          <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+            <h2 className="display reveal text-2xl md:text-4xl">İmza hizmetlerimiz</h2>
+            <p className="muted">Süreler ustanın hızına göre değişebilir; fiyatlar sabittir.</p>
+          </div>
 
-            <ul className="mt-10 space-y-6">
-              {[
-                {
-                  icon: Clock,
-                  title: 'Randevun dakikası dakikasına planlanır',
-                  body: 'Birden fazla hizmet seçtiğinde takvimde tek blok açılır; işlemler arka arkaya dizilir, boşta beklemezsin.',
-                },
-                {
-                  icon: Droplets,
-                  title: 'Bekleme süren bize yazılır, sana değil',
-                  body: 'Boya beklemesi gibi pasif süreler ustanın takviminde ayrı işaretlenir. Bu sayede kimse "boya bekliyor" diye kapıda tutulmaz.',
-                },
-                {
-                  icon: FlaskConical,
-                  title: 'Alerji ve hassasiyet kaydın dosyanda durur',
-                  body: 'Bir kez söylediğin hassasiyet her randevuda ustanın ekranında çıkar. Gerekiyorsa patch testi biz hatırlatırız.',
-                },
-                {
-                  icon: Sparkles,
-                  title: 'Tek kullanımlık malzeme, sterilize alet',
-                  body: 'Törpü ve benzeri malzemeler tek kullanımlıktır; metal aletler her müşteriden sonra sterilizasyondan geçer.',
-                },
-              ].map((item) => (
-                <li key={item.title} className="flex gap-4">
-                  <span
-                    aria-hidden
-                    className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-brass-300 text-brass-700"
-                  >
-                    <item.icon size={18} strokeWidth={1.5} />
-                  </span>
-                  <div>
-                    <p className="font-semibold">{item.title}</p>
-                    <p className="muted mt-1 leading-relaxed">{item.body}</p>
+          <ul className="mt-6 border-t border-sand-200 md:mt-8">
+            {featuredServices.map((service) => (
+              <li key={service.id} className="border-b border-sand-200">
+                <Link
+                  href={`/randevu?services=${service.id}`}
+                  className="group flex items-start justify-between gap-4 py-4 transition-colors hover:bg-sand-50 md:px-2"
+                >
+                  <div className="min-w-0">
+                    <p className="eyebrow">{service.categoryName}</p>
+                    <p className="display mt-1 text-lg md:text-xl">{service.name}</p>
+                    {service.description && (
+                      <p className="muted mt-1 line-clamp-2 max-w-xl leading-relaxed">
+                        {service.description}
+                      </p>
+                    )}
+                    <p className="mt-2 text-xs tabular-nums text-ink-500">
+                      Yaklaşık {durationLabel(service.totalMin)}
+                      {service.passiveMin > 0 &&
+                        ` · ${durationLabel(service.passiveMin)} işlem beklemesi dahil`}
+                    </p>
                   </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Mekân kolajı — "burası neresi?" sorusuna görsel cevap */}
-          <div className="grid grid-cols-2 gap-3 md:gap-4">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={photoOrFallback('interior-1.jpg', 'hero.jpg')}
-              alt="Salonun çalışma alanı"
-              loading="lazy"
-              className="col-span-2 h-56 w-full rounded-[2px] object-cover md:h-72"
-            />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={photoOrFallback('detay-firca.jpg', 'interior-2.jpg')}
-              alt="Kullandığımız fırça ve malzemeler"
-              loading="lazy"
-              className="h-40 w-full rounded-[2px] object-cover md:h-48"
-            />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={photoOrFallback('interior-2.jpg', 'interior-3.jpg')}
-              alt="Salon iç mekânı"
-              loading="lazy"
-              className="h-40 w-full rounded-[2px] object-cover md:h-48"
-            />
-          </div>
+                  <span className="flex shrink-0 items-center gap-3 text-base font-medium tabular-nums text-ink-900 md:text-lg">
+                    {formatTl(service.price)}
+                    <ArrowRight size={16} strokeWidth={1.5} aria-hidden className="text-ink-300 transition-transform duration-300 group-hover:translate-x-[3px] group-hover:text-plum-600" />
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
       {/* ================================================================
-          5. VİTRİN HİZMETLERİ — süre ve fiyat açıkça yazılır
+          5. PORTFOLYO — yapılmış işler; kategori filtresi sayfada çalışır
           ============================================================ */}
-      <section className="bleed py-20 md:py-28">
-        <p className="eyebrow reveal">Öne çıkanlar</p>
-        <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-          <h2 className="display reveal text-3xl md:text-5xl">İmza hizmetlerimiz</h2>
-          <p className="muted">Süreler ustanın hızına göre değişebilir; fiyatlar sabittir.</p>
+      <section id="portfolyo" className="bleed scroll-mt-20 py-12 md:py-16">
+        <p className="eyebrow reveal">Portfolyo</p>
+        <h2 className="display reveal mt-2 text-2xl md:text-4xl">Son işlerimiz</h2>
+        <div className="mt-5">
+          {portfolioData.items.length > 0 ? (
+            <PortfolioGallery categories={portfolioData.categories} items={portfolioData.items} />
+          ) : (
+            <p className="muted">Henüz paylaşılmış bir iş yok.</p>
+          )}
         </div>
-
-        <ul className="mt-10 border-t border-sand-200 md:mt-14">
-          {featuredServices.map((service) => (
-            <li key={service.id} className="border-b border-sand-200">
-              <Link
-                href={`/randevu?services=${service.id}`}
-                className="group flex items-start justify-between gap-6 py-6 transition-colors hover:bg-white/60 md:px-2"
-              >
-                <div className="min-w-0">
-                  <p className="eyebrow">{service.categoryName}</p>
-                  <p className="display mt-1.5 text-xl md:text-2xl">{service.name}</p>
-                  {service.description && (
-                    <p className="muted mt-1.5 max-w-xl leading-relaxed">{service.description}</p>
-                  )}
-                  <p className="mt-3 text-xs tabular-nums text-ink-500">
-                    Yaklaşık {durationLabel(service.totalMin)}
-                    {service.passiveMin > 0 &&
-                      ` · ${durationLabel(service.passiveMin)} işlem beklemesi dahil`}
-                  </p>
-                </div>
-                <span className="flex shrink-0 items-center gap-3 text-base font-medium tabular-nums text-ink-900 md:text-lg">
-                  {formatTl(service.price)}
-                  <ArrowRight size={16} strokeWidth={1.5} aria-hidden className="text-ink-300 transition-transform duration-300 group-hover:translate-x-[3px] group-hover:text-plum-600" />
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
       </section>
 
       {/* ================================================================
           6. YORUMLAR — sosyal kanıt, tamamı gerçek randevulardan
           ============================================================ */}
-      {reviewSummary.count > 0 && reviewSummary.average !== null && (
-        <section className="bg-sand-100 py-20 md:py-28">
-          <div className="bleed">
-            <p className="eyebrow">Değerlendirmeler</p>
-            <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-              <h2 className="display reveal text-3xl md:text-5xl">Müşterilerimiz ne diyor?</h2>
-              <p className="muted">
-                Tamamı, salonda hizmet almış müşteriler tarafından yazıldı.
-              </p>
-            </div>
+      <section id="yorumlar" className="scroll-mt-20 bg-sand-100 py-12 md:py-16">
+        <div className="bleed">
+          <p className="eyebrow">Değerlendirmeler</p>
+          <h2 className="display reveal mt-2 text-2xl md:text-4xl">Müşterilerimiz ne diyor?</h2>
+          <p className="muted mt-2 max-w-2xl">
+            Tamamı, salonda tamamlanmış randevusu olan müşteriler tarafından yazıldı.
+          </p>
 
-            <div className="mt-10 grid gap-8 md:mt-14 md:grid-cols-[minmax(0,320px)_1fr] md:items-start md:gap-12">
-              {/* Puan özeti */}
-              <div className="rounded-[4px] border border-sand-200 bg-white p-6">
-                <div className="flex items-baseline gap-2">
-                  <span className="display text-5xl font-light tabular-nums text-plum-700">
-                    {reviewSummary.average.toFixed(1).replace('.', ',')}
-                  </span>
-                  <span className="text-sm text-ink-500">/ 5</span>
+          {reviewSummary.count > 0 && reviewSummary.average !== null ? (
+            <div className="mt-5 space-y-4">
+              {/* Puan özeti — tek satırlık şerit */}
+              <div className="flex flex-wrap items-center gap-x-8 gap-y-3 rounded-[4px] border border-sand-200 bg-white p-4">
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="display text-4xl font-light tabular-nums text-plum-700">
+                      {reviewSummary.average.toFixed(1).replace('.', ',')}
+                    </span>
+                    <span className="text-sm text-ink-500">/ 5</span>
+                  </div>
+                  <Stars value={reviewSummary.average} size="sm" className="mt-1" />
+                  <p className="muted mt-1">
+                    {reviewSummary.count} değerlendirme · %
+                    {Math.round(reviewSummary.positiveRate * 100)} dört yıldız ve üzeri
+                  </p>
                 </div>
-                <Stars value={reviewSummary.average} size="lg" className="mt-2" />
-                <p className="muted mt-2">
-                  {reviewSummary.count} değerlendirme ·{' '}
-                  <span className="font-medium text-ink-700">
-                    %{Math.round(reviewSummary.positiveRate * 100)}
-                  </span>{' '}
-                  dört yıldız ve üzeri
-                </p>
 
                 {/* Yıldız dağılımı — dürüstlük göstergesi */}
-                <ul className="mt-5 space-y-1.5">
+                <ul className="min-w-[200px] flex-1 space-y-1">
                   {([5, 4, 3, 2, 1] as const).map((star) => {
                     const value = reviewSummary.distribution[star];
                     const ratio = reviewSummary.count ? (value / reviewSummary.count) * 100 : 0;
@@ -510,55 +453,46 @@ export default async function HomePage() {
                       <li key={star} className="flex items-center gap-2 text-xs text-ink-500">
                         <span className="w-3 tabular-nums">{star}</span>
                         <Star size={12} strokeWidth={1.5} aria-hidden className="fill-brass-500 text-brass-500" />
-                        <span
-                          aria-hidden
-                          className="h-1 flex-1 overflow-hidden bg-sand-100"
-                        >
-                          <span
-                            className="block h-full bg-plum-600"
-                            style={{ width: `${ratio}%` }}
-                          />
+                        <span aria-hidden className="h-1 flex-1 overflow-hidden bg-sand-100">
+                          <span className="block h-full bg-plum-600" style={{ width: `${ratio}%` }} />
                         </span>
                         <span className="w-6 text-right tabular-nums">{value}</span>
                       </li>
                     );
                   })}
                 </ul>
-
-                <p className="mt-5 text-xs leading-relaxed text-ink-500">
-                  Yorumlar yalnızca tamamlanmış randevusu olan müşteriler tarafından yazılır.
-                </p>
-
-                <Link href="/yorumlar" className="btn-secondary mt-4 w-full">
-                  Tüm yorumları oku
-                </Link>
               </div>
 
-              {/* Yorum kartları */}
-              <ul className="grid gap-3 sm:grid-cols-2 md:gap-4">
-                {reviews.map((review) => (
-                  <li key={review.id}>
-                    <ReviewCard review={review} />
-                  </li>
-                ))}
-              </ul>
+              <ReviewsBrowser reviews={reviews} />
             </div>
-          </div>
-        </section>
-      )}
+          ) : (
+            <p className="muted mt-5">Henüz yayınlanmış bir yorum yok.</p>
+          )}
+
+          <p className="mt-5 text-center text-sm text-ink-700">
+            Sen de değerlendirmek ister misin? Tamamlanan randevularına{' '}
+            <Link href="/randevularim" className="btn-link">
+              Randevu Sorgula
+            </Link>{' '}
+            sayfasından puan verebilir, yorumunu yazabilirsin.
+          </p>
+        </div>
+      </section>
 
       {/* ================================================================
           7. EKİP
           ============================================================ */}
-      <section className="bleed py-20 md:py-28">
+      <section id="ekip" className="bleed scroll-mt-20 py-12 md:py-16">
         <p className="eyebrow reveal">Ekibimiz</p>
-        <h2 className="display reveal mt-3 text-3xl md:text-5xl">İşi yapan eller</h2>
-        <p className="muted mt-3 max-w-xl">
-          Randevu alırken ustanı kendin seçebilirsin. Puanlar yalnızca en az üç yorum almış
-          ustalar için gösterilir.
-        </p>
+        <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+          <h2 className="display reveal text-2xl md:text-4xl">İşi yapan eller</h2>
+          <p className="muted max-w-xl">
+            Randevu alırken ustanı kendin seçebilirsin. Puanlar yalnızca en az üç yorum almış
+            ustalar için gösterilir.
+          </p>
+        </div>
 
-        <ul className="mt-10 grid gap-5 sm:grid-cols-2 md:mt-14 lg:grid-cols-4">
+        <ul className="mt-6 grid grid-cols-2 gap-3 md:mt-8 md:gap-4 lg:grid-cols-4">
           {staff.map((member, index) => {
             const rating = member.rating;
             // Uzmanlık: verdiği hizmetlerden ilk üçü (backend hazırlar).
@@ -575,7 +509,7 @@ export default async function HomePage() {
                 key={member.id}
                 className="group overflow-hidden rounded-[4px] border border-sand-200 bg-white"
               >
-                <div className="aspect-[4/5] w-full overflow-hidden bg-sand-100">
+                <div className="aspect-[4/3] w-full overflow-hidden bg-sand-100 md:aspect-[4/5]">
                   {member.photoUrl ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img
@@ -591,19 +525,19 @@ export default async function HomePage() {
                   )}
                 </div>
 
-                <div className="p-4">
-                  <p className="display text-lg leading-tight">{member.name}</p>
-                  <p className="eyebrow mt-1.5 !text-[10px]">{roleLabel}</p>
+                <div className="p-3 md:p-4">
+                  <p className="display text-base leading-tight md:text-lg">{member.name}</p>
+                  <p className="eyebrow mt-1 !text-[10px]">{roleLabel}</p>
 
                   {rating && (
-                    <p className="mt-2 flex items-center gap-1.5 text-xs text-ink-500">
+                    <div className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-500">
                       <Stars value={rating.average} size="sm" />
                       {rating.average.toFixed(1).replace('.', ',')} ({rating.count})
-                    </p>
+                    </div>
                   )}
 
                   {specialties.length > 0 && (
-                    <p className="muted mt-2 leading-relaxed">{specialties.join(' · ')}</p>
+                    <p className="muted mt-1.5 leading-relaxed">{specialties.join(' · ')}</p>
                   )}
                 </div>
               </li>
@@ -613,63 +547,74 @@ export default async function HomePage() {
       </section>
 
       {/* ================================================================
-          8. GALERİ
+          8. KALİTE SÖZÜ — "iyi salon" iddiası değil, çalışma biçimi
           ============================================================ */}
-      {portfolio.length > 0 && (
-        <section className="bg-white py-20 md:py-28">
-          <div className="bleed">
-            <p className="eyebrow reveal">Portfolyo</p>
-            <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-              <h2 className="display reveal text-3xl md:text-5xl">Son işlerimiz</h2>
-              <Link href="/portfolyo" className="btn-link group">
-                Tüm galeri ({stats.portfolioCount})
-                <ArrowRight size={16} strokeWidth={1.5} aria-hidden className="transition-transform duration-300 group-hover:translate-x-[3px]" />
-              </Link>
-            </div>
+      <section className="bg-white py-12 md:py-16">
+        <div className="bleed">
+          <p className="eyebrow">Kalite sözümüz</p>
+          <h2 className="display reveal mt-2 text-2xl md:text-4xl">
+            İyi iş, iyi malzeme ve dürüst bir saat.
+          </h2>
+          <p className="muted mt-2 max-w-2xl leading-relaxed">
+            Bir bakım randevusunun en sinir bozucu tarafı belirsizliktir: ne kadar süreceği, ne
+            kadar tutacağı, sıranın ne zaman geleceği. Biz bu üçünü de baştan söylüyoruz.
+          </p>
 
-            <div className="mt-10 grid grid-cols-2 gap-3 md:mt-14 md:grid-cols-4 md:gap-4">
-              {portfolio.slice(0, 8).map((item) => (
-                <Link
-                  key={item.id}
-                  href="/portfolyo"
-                  className="group relative aspect-square overflow-hidden rounded-[4px] border border-sand-200"
+          <ul className="mt-6 grid gap-x-8 gap-y-5 sm:grid-cols-2 md:mt-8">
+            {[
+              {
+                icon: Clock,
+                title: 'Randevun dakikası dakikasına planlanır',
+                body: 'Birden fazla hizmet seçtiğinde takvimde tek blok açılır; işlemler arka arkaya dizilir.',
+              },
+              {
+                icon: Droplets,
+                title: 'Bekleme süren bize yazılır, sana değil',
+                body: 'Boya beklemesi gibi pasif süreler ustanın takviminde ayrı işaretlenir; kimse kapıda tutulmaz.',
+              },
+              {
+                icon: FlaskConical,
+                title: 'Alerji ve hassasiyet kaydın dosyanda durur',
+                body: 'Bir kez söylediğin hassasiyet her randevuda ustanın ekranında çıkar; gerekirse patch testi hatırlatırız.',
+              },
+              {
+                icon: Sparkles,
+                title: 'Tek kullanımlık malzeme, sterilize alet',
+                body: 'Törpü gibi malzemeler tek kullanımlıktır; metal aletler her müşteriden sonra sterilize edilir.',
+              },
+            ].map((item) => (
+              <li key={item.title} className="flex gap-3">
+                <span
+                  aria-hidden
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-brass-300 text-brass-700"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={item.imageUrl}
-                    alt={item.title}
-                    loading="lazy"
-                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-                  />
-                  <div
-                    aria-hidden
-                    className="absolute inset-0 bg-gradient-to-t from-ink-900/85 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100"
-                  />
-                  <p className="absolute inset-x-0 bottom-0 truncate p-3 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100">
-                    {item.title}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
+                  <item.icon size={16} strokeWidth={1.5} />
+                </span>
+                <div>
+                  <p className="font-semibold">{item.title}</p>
+                  <p className="muted mt-0.5 leading-relaxed">{item.body}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
 
       {/* ================================================================
           9. ZİYARET — saatler, adres, telefon
           ============================================================ */}
-      <section className="bleed py-20 md:py-28">
-        <div className="grid gap-10 md:grid-cols-2 md:items-center md:gap-16">
+      <section className="bleed py-12 md:py-16">
+        <div className="grid gap-6 md:grid-cols-2 md:items-center md:gap-12">
           <div className="order-2 md:order-1">
             <p className="eyebrow reveal">Bize gel</p>
-            <h2 className="display reveal mt-3 text-3xl md:text-5xl">{branch.name}</h2>
-            <p className="muted mt-3">{branch.address}</p>
+            <h2 className="display reveal mt-2 text-2xl md:text-4xl">{branch.name}</h2>
+            <p className="muted mt-2">{branch.address}</p>
 
-            <dl className="mt-6 divide-y divide-sand-200 border-y border-sand-200">
+            <dl className="mt-4 divide-y divide-sand-200 border-y border-sand-200">
               {openingHours.map((row) => (
                 <div
                   key={row.weekday}
-                  className={`flex items-center justify-between py-3 text-sm tabular-nums ${
+                  className={`flex items-center justify-between py-2 text-sm tabular-nums ${
                     row.isToday ? 'font-semibold text-plum-700' : 'text-ink-700'
                   }`}
                 >
@@ -686,7 +631,7 @@ export default async function HomePage() {
               ))}
             </dl>
 
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-5 flex flex-wrap gap-3">
               <Link href="/randevu" className="btn-primary">
                 Randevu al
               </Link>
@@ -703,7 +648,7 @@ export default async function HomePage() {
             src={photoOrFallback('interior-3.jpg', 'interior-1.jpg', 'hero.jpg')}
             alt="Salonun içi"
             loading="lazy"
-            className="order-1 h-64 w-full rounded-[2px] object-cover md:order-2 md:h-[26rem]"
+            className="order-1 h-44 w-full rounded-[2px] object-cover md:order-2 md:h-80"
           />
         </div>
       </section>
@@ -711,12 +656,12 @@ export default async function HomePage() {
       {/* ================================================================
           10. SIKÇA SORULANLAR
           ============================================================ */}
-      <section className="bg-white py-20 md:py-28">
+      <section className="bg-white py-12 md:py-16">
         <div className="bleed max-w-3xl">
           <p className="eyebrow reveal">Sıkça sorulanlar</p>
-          <h2 className="display reveal mt-3 text-3xl md:text-5xl">Merak edilenler</h2>
+          <h2 className="display reveal mt-2 text-2xl md:text-4xl">Merak edilenler</h2>
 
-          <div className="mt-10 divide-y divide-sand-200 border-y border-sand-200">
+          <div className="mt-6 divide-y divide-sand-200 border-y border-sand-200">
             {[
               {
                 q: 'Randevu almak için üye olmam gerekiyor mu?',
@@ -739,7 +684,7 @@ export default async function HomePage() {
                 a: 'Randevu notuna yazman yeterli; kaydın dosyana işlenir ve her randevuda ustanın ekranında görünür. Saç boyası gibi işlemlerde gerekiyorsa 48 saat önceden patch testi öneririz.',
               },
             ].map((item) => (
-              <details key={item.q} className="group py-4">
+              <details key={item.q} className="group py-2">
                 <summary className="flex cursor-pointer touch-target list-none items-center justify-between gap-4 font-medium">
                   {item.q}
                   <Plus
@@ -749,7 +694,7 @@ export default async function HomePage() {
                     className="shrink-0 text-plum-600 transition-transform duration-300 group-open:rotate-45"
                   />
                 </summary>
-                <p className="muted mt-3 leading-relaxed">{item.a}</p>
+                <p className="muted mt-2 pb-2 leading-relaxed">{item.a}</p>
               </details>
             ))}
           </div>
@@ -759,7 +704,7 @@ export default async function HomePage() {
       {/* ================================================================
           11. KAPANIŞ ÇAĞRISI
           ============================================================ */}
-      <section className="bleed py-20 md:py-28">
+      <section className="bleed py-12 md:py-16">
         <div className="relative overflow-hidden rounded-[4px]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -771,15 +716,15 @@ export default async function HomePage() {
           />
           <div aria-hidden className="absolute inset-0 bg-ink-900/72" />
 
-          <div className="relative px-6 py-20 text-center text-white md:py-28">
-            <h2 className="display mx-auto max-w-xl text-3xl font-light leading-tight md:text-5xl">
+          <div className="relative px-6 py-10 text-center text-white md:py-14">
+            <h2 className="display mx-auto max-w-xl text-2xl font-light leading-tight md:text-4xl">
               Uygun saatini şimdi seç
             </h2>
-            <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-white/85 md:text-base">
+            <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-white/85 md:text-base">
               Takvimi aç, sana uyan saati gör. Birden çok hizmet seçersen tek blok açılır ve
               daha erken çıkarsın.
             </p>
-            <Link href="/randevu" className="btn-light group mt-8">
+            <Link href="/randevu" className="btn-light group mt-6">
               Randevu al
               <ArrowRight size={16} strokeWidth={1.5} aria-hidden className="transition-transform duration-300 group-hover:translate-x-[3px]" />
             </Link>

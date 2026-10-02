@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, CircleCheck, Plus, TriangleAlert, X } from 'lucide-react';
+import { Check, CircleCheck, Minus, Plus, TriangleAlert, UserPlus, X } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -385,9 +385,24 @@ export function GroupFlow({
     updatePerson(0, { firstName: '', phone: '' });
   }
 
+  // Yeni eklenen kartın ad alanına odaklanılır (sayfa o karta kayar).
+  const focusKey = useRef<number | null>(null);
+  useEffect(() => {
+    if (focusKey.current === null) return;
+    const input = document.getElementById(`g-name-${focusKey.current}`);
+    focusKey.current = null;
+    if (input) {
+      input.focus({ preventScroll: true });
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      input.closest('li')?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+    }
+  }, [people.length]);
+
   function addPerson() {
     if (people.length >= MAX_PEOPLE) return;
-    setPeople((prev) => [...prev, newPerson()]);
+    const person = newPerson();
+    focusKey.current = person.key;
+    setPeople((prev) => [...prev, person]);
   }
 
   function removePerson(index: number) {
@@ -395,11 +410,39 @@ export function GroupFlow({
     setPeople((prev) => prev.filter((_, i) => i !== index));
   }
 
+  /** Kişi sayısını doğrudan ayarlar. Azaltırken önce BOŞ kartlar çıkarılır;
+   *  yazılmış bilgiler ancak boş kart kalmazsa (sondan) gider. 1. kart hep kalır. */
+  function setPeopleCount(target: number) {
+    const count = Math.min(MAX_PEOPLE, Math.max(MIN_PEOPLE, target));
+    if (count === people.length) return;
+    if (count > people.length) {
+      const added = Array.from({ length: count - people.length }, () => newPerson());
+      focusKey.current = added[0].key;
+      setPeople((prev) => [...prev, ...added]);
+      return;
+    }
+    const isEmpty = (p: Person) => !p.firstName.trim() && !p.phone.trim() && p.serviceIds.length === 0;
+    setPeople((prev) => {
+      const next = [...prev];
+      while (next.length > count) {
+        let drop = next.length - 1;
+        for (let i = next.length - 1; i > 0; i--) {
+          if (isEmpty(next[i])) {
+            drop = i;
+            break;
+          }
+        }
+        next.splice(drop, 1);
+      }
+      return next;
+    });
+  }
+
   /* ---------- Ekranlar ---------- */
 
   if (!customer) {
     return (
-      <div className="py-6">
+      <div className="page-shell py-6">
         <PhoneVerify
           onVerified={setCustomer}
           title="Grup randevusu"
@@ -411,7 +454,7 @@ export function GroupFlow({
 
   if (created) {
     return (
-      <section className="mx-auto max-w-xl space-y-6 py-6">
+      <section className="page-shell !max-w-xl space-y-6 py-6">
         <div className="text-center">
           <CircleCheck size={40} strokeWidth={1.5} className="mx-auto text-success-600" aria-hidden />
           <h1 className="display mt-3 text-3xl md:text-4xl">Grup randevun hazır</h1>
@@ -463,7 +506,7 @@ export function GroupFlow({
   const grandPrice = people.reduce((n, p) => n + summaryOf(p).price, 0);
 
   return (
-    <div className="space-y-6 pb-4">
+    <div className="page-shell space-y-6 pt-6 pb-4">
       <Stepper
         step={step}
         onJump={(s) => {
@@ -495,9 +538,55 @@ export function GroupFlow({
             <p className="eyebrow">Grup randevusu</p>
             <h1 className="display text-3xl md:text-4xl">Kimler geliyor?</h1>
             <p className="muted mt-2">
-              En fazla {MAX_PEOPLE} kişi. Herkes aynı saatte, ayrı ustalarla başlar. Diğer kişilere
-              WhatsApp ile bilgi gönderilir.
+              Herkes aynı saatte, ayrı ustalarla başlar. Diğer kişilere WhatsApp ile bilgi gönderilir.
             </p>
+          </div>
+
+          {/* Kişi sayısı: büyük −/+ ve tek dokunuşla 2·3·4 seçimi */}
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-[4px] border border-plum-600/30 bg-plum-50/60 p-4">
+            <div>
+              <p className="eyebrow">Kaç kişi?</p>
+              <p className="muted mt-0.5 text-xs">
+                {MIN_PEOPLE}–{MAX_PEOPLE} kişi seçebilirsin
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setPeopleCount(people.length - 1)}
+                disabled={people.length <= MIN_PEOPLE}
+                aria-label="Bir kişi azalt"
+                className="grid h-12 w-12 place-items-center rounded-full border border-ink-900/20 bg-white text-ink-900 transition-colors hover:border-plum-600 hover:text-plum-600 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-ink-900/20 disabled:hover:text-ink-900"
+              >
+                <Minus size={20} strokeWidth={1.75} aria-hidden />
+              </button>
+              <p className="min-w-[4.5rem] text-center" aria-live="polite">
+                <span className="display block text-4xl leading-none tabular-nums">{people.length}</span>
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-500">kişi</span>
+              </p>
+              <button
+                type="button"
+                onClick={() => setPeopleCount(people.length + 1)}
+                disabled={people.length >= MAX_PEOPLE}
+                aria-label="Bir kişi ekle"
+                className="grid h-12 w-12 place-items-center rounded-full bg-plum-600 text-white transition-colors hover:bg-plum-700 disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <Plus size={20} strokeWidth={1.75} aria-hidden />
+              </button>
+            </div>
+            <div className="flex w-full gap-2" role="group" aria-label="Kişi sayısını seç">
+              {Array.from({ length: MAX_PEOPLE - MIN_PEOPLE + 1 }, (_, k) => MIN_PEOPLE + k).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setPeopleCount(n)}
+                  aria-pressed={people.length === n}
+                  className="chip flex-1 justify-center"
+                >
+                  {n} kişi
+                </button>
+              ))}
+            </div>
           </div>
 
           <ul className="space-y-3">
@@ -512,11 +601,11 @@ export function GroupFlow({
                     {people.length > MIN_PEOPLE && i > 0 && (
                       <button
                         type="button"
-                        className="btn-link"
+                        className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-sand-300 px-3 text-xs font-semibold uppercase tracking-[0.1em] text-ink-700 transition-colors hover:border-danger-700 hover:text-danger-700"
                         onClick={() => removePerson(i)}
                         aria-label={`${i + 1}. kişiyi çıkar`}
                       >
-                        <X size={16} strokeWidth={1.5} aria-hidden /> Çıkar
+                        <X size={14} strokeWidth={1.75} aria-hidden /> Çıkar
                       </button>
                     )}
                   </div>
@@ -580,10 +669,26 @@ export function GroupFlow({
             })}
           </ul>
 
-          {people.length < MAX_PEOPLE && (
-            <button type="button" className="btn-secondary btn-sm" onClick={addPerson}>
-              <Plus size={16} strokeWidth={1.5} aria-hidden /> Kişi ekle
+          {people.length < MAX_PEOPLE ? (
+            <button
+              type="button"
+              onClick={addPerson}
+              className="group flex w-full items-center justify-center gap-3 rounded-[4px] border-2 border-dashed border-plum-600/40 bg-white/60 px-4 py-5 text-plum-600 transition-colors hover:border-plum-600 hover:bg-plum-50"
+            >
+              <span className="grid h-10 w-10 place-items-center rounded-full bg-plum-600 text-white transition-transform group-hover:scale-105">
+                <UserPlus size={18} strokeWidth={1.75} aria-hidden />
+              </span>
+              <span className="text-left">
+                <span className="block font-semibold">Kişi ekle</span>
+                <span className="block text-xs text-ink-500">
+                  {people.length}/{MAX_PEOPLE} kişi · {MAX_PEOPLE - people.length} kişi daha eklenebilir
+                </span>
+              </span>
             </button>
+          ) : (
+            <p className="rounded-[4px] border border-sand-200 px-4 py-3 text-center text-sm text-ink-500">
+              En fazla {MAX_PEOPLE} kişi ekleyebilirsin. Daha kalabalık gruplar için salonu ara.
+            </p>
           )}
         </section>
       )}

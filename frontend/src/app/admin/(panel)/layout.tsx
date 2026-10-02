@@ -1,12 +1,20 @@
+import { ExternalLink, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { InstallButton } from '@/components/pwa/InstallButton';
 import { serverApi, type MeResponse, type SalonInfo } from '@/lib/server-api';
-import { AdminNavLink, StaffLogout } from './nav';
+import { AdminAccordion, StaffLogout, type AdminSection } from './nav';
 import type { MessagingStatus } from './whatsapp/whatsapp-connect';
 
 export const dynamic = 'force-dynamic';
+
+/** Ham rol kodu yerine insan okur etiket. */
+const ROLE_LABEL: Record<string, string> = {
+  OWNER: 'Salon sahibi',
+  MANAGER: 'Yönetici',
+  STAFF: 'Personel',
+};
 
 /**
  * Panel kabuğu ve YETKİ KAPISI.
@@ -33,61 +41,62 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
   const whatsappDown = messaging?.driver === 'evolution' && !messaging.ready;
 
-  const links = [
-    { href: '/admin', label: 'Panel', icon: '📊' },
-    { href: '/admin/takvim', label: 'Takvim', icon: '🗓️' },
-    { href: '/admin/musteriler', label: 'Müşteriler', icon: '👥' },
-    { href: '/admin/stok', label: 'Stok', icon: '📦' },
-    { href: '/admin/kampanyalar', label: 'Kampanya', icon: '🎯' },
-    { href: '/admin/hatirlatmalar', label: 'Hatırlatma', icon: '🔔' },
-    { href: '/admin/firsat-saatleri', label: 'Fırsat', icon: '🔥' },
-    { href: '/admin/portfolyo', label: 'Portfolyo', icon: '✨' },
-    { href: '/admin/yorumlar', label: 'Yorumlar', icon: '⭐' },
-    ...(isManager ? [{ href: '/admin/whatsapp', label: 'WhatsApp', icon: '💬' }] : []),
+  const sections: AdminSection[] = [
+    { href: '/admin/ozet', label: 'Genel Bakış', desc: 'Günün özeti ve uyarılar', icon: 'ozet' },
+    { href: '/admin/takvim', label: 'Takvim', desc: 'Günlük randevu akışı', icon: 'takvim' },
+    { href: '/admin/musteriler', label: 'Müşteriler', desc: 'Kayıtlar, notlar ve geçmiş', icon: 'musteriler' },
+    { href: '/admin/stok', label: 'Stok', desc: 'Ürünler ve kritik seviyeler', icon: 'stok' },
+    { href: '/admin/kampanyalar', label: 'Kampanyalar', desc: 'İndirim ve duyurular', icon: 'kampanyalar' },
+    { href: '/admin/hatirlatmalar', label: 'Hatırlatmalar', desc: 'Randevu bildirimleri', icon: 'hatirlatmalar' },
+    { href: '/admin/firsat-saatleri', label: 'Fırsat Saatleri', desc: 'Boş saatleri değerlendir', icon: 'firsat' },
+    { href: '/admin/portfolyo', label: 'Portfolyo', desc: 'Çalışma fotoğrafları', icon: 'portfolyo' },
+    { href: '/admin/yorumlar', label: 'Yorumlar', desc: 'Müşteri değerlendirmeleri', icon: 'yorumlar' },
+    ...(isManager
+      ? ([
+          { href: '/admin/whatsapp', label: 'WhatsApp', desc: 'Bağlantı ve mesajlaşma', icon: 'whatsapp' },
+        ] as AdminSection[])
+      : []),
   ];
 
   return (
-    <div className="min-h-dvh bg-sand-50">
-      <header className="sticky top-0 z-30 border-b border-sand-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
+    <div className="admin-shell min-h-dvh bg-sand-50">
+      <header data-admin-header className="sticky top-0 z-30 border-b border-sand-200 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{branch.salon.name}</p>
-            <p className="muted">
-              {staff.name} · {staff.role}
+            <p className="eyebrow">Yönetim paneli</p>
+            <p className="display truncate text-lg leading-tight">{branch.salon.name}</p>
+            <p className="muted truncate !text-xs">
+              {staff.name} · {ROLE_LABEL[staff.role] ?? staff.role}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <InstallButton />
-            <Link href="/" className="btn-ghost hidden text-sm md:inline-flex">
+            <Link href="/" className="btn-ghost btn-sm hidden md:inline-flex">
               Siteyi gör
+              <ExternalLink size={14} strokeWidth={1.5} aria-hidden />
             </Link>
             <StaffLogout />
           </div>
         </div>
-
-        <nav className="mx-auto max-w-7xl overflow-x-auto px-2 pb-2">
-          <div className="flex gap-1">
-            {links.map((l) => (
-              <AdminNavLink key={l.href} href={l.href} icon={l.icon}>
-                {l.label}
-              </AdminNavLink>
-            ))}
-          </div>
-        </nav>
       </header>
 
       {whatsappDown && (
-        <div className="border-b border-rose-200 bg-rose-50">
-          <p className="mx-auto max-w-7xl px-4 py-2 text-sm text-rose-700">
-            WhatsApp bağlı değil: müşteriler giriş kodu alamıyor ve hatırlatmalar gönderilmiyor.{' '}
-            <Link href="/admin/whatsapp" className="font-semibold underline">
-              Bağlantıyı kur
-            </Link>
+        <div className="border-b border-sand-200 bg-white">
+          <p className="mx-auto flex max-w-7xl items-start gap-2.5 border-l-2 border-danger-600 px-4 py-2.5 text-sm text-ink-700">
+            <TriangleAlert size={16} strokeWidth={1.5} className="mt-0.5 shrink-0 text-danger-600" aria-hidden />
+            <span>
+              WhatsApp bağlı değil: müşteriler giriş kodu alamıyor ve hatırlatmalar gönderilmiyor.{' '}
+              <Link href="/admin/whatsapp" className="font-semibold text-plum-700 underline underline-offset-2">
+                Bağlantıyı kur
+              </Link>
+            </span>
           </p>
         </div>
       )}
 
-      <main className="mx-auto max-w-7xl px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">{children}</main>
+      <main className="mx-auto max-w-7xl px-3 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-4">
+        <AdminAccordion sections={sections}>{children}</AdminAccordion>
+      </main>
     </div>
   );
 }

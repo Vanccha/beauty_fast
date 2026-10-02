@@ -1,5 +1,6 @@
 'use client';
 
+import { AlertTriangle, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useRef, useState } from 'react';
 
@@ -273,18 +274,17 @@ export function CalendarBoard({
   return (
     <div className="space-y-3">
       {error && (
-        <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <p className="rounded-[4px] border border-brass-300 bg-sand-100 px-3 py-2 text-sm text-ink-900">
           {error}
         </p>
       )}
 
-      <p className="muted">
-        Randevuyu sürükleyerek başka saate veya ustaya taşıyabilirsin (dokunmatikte basılı tut).
-        Çizgili alanlar ustanın <strong>serbest</strong> olduğu bekleme süreleridir — oraya başka
-        bir müşteri alınabilir.
+      <p className="muted text-xs">
+        Sürükleyerek taşıyın (dokunmatikte basılı tutun). Çizgili alanlar ustanın{' '}
+        <strong>serbest</strong> olduğu bekleme süreleridir.
       </p>
 
-      <div className="overflow-x-auto rounded-2xl border border-sand-200 bg-white">
+      <div className="overflow-x-auto rounded-[4px] border border-sand-200 bg-white">
         <div className="flex min-w-[640px]">
           {/* Saat ekseni */}
           <div className="w-14 shrink-0 border-r border-sand-200">
@@ -310,8 +310,8 @@ export function CalendarBoard({
                   key={s.id}
                   className="flex flex-1 flex-col items-center justify-center border-l border-sand-100 px-1"
                 >
-                  <span className="truncate text-sm font-medium">{s.name}</span>
-                  {!s.isWorking && <span className="text-[10px] text-rose-600">izinli</span>}
+                  <span className="truncate text-xs font-semibold uppercase tracking-wide text-ink-900">{s.name}</span>
+                  {!s.isWorking && <span className="text-[10px] text-ink-500">izinli</span>}
                 </div>
               ))}
             </div>
@@ -357,7 +357,7 @@ export function CalendarBoard({
                     .map((l) => (
                       <div
                         key={`lock-${l.id}`}
-                        className="absolute left-1 right-1 rounded-lg border border-dashed border-amber-400 bg-amber-50/80 px-1 py-0.5 text-[10px] text-amber-800"
+                        className="absolute left-1 right-1 rounded-[2px] border border-dashed border-brass-500 bg-sand-100/80 px-1 py-0.5 text-[10px] text-brass-700"
                         style={{
                           top: (l.startMin - openMinute) * PPM,
                           height: (l.endMin - l.startMin) * PPM,
@@ -386,7 +386,7 @@ export function CalendarBoard({
                           onPointerDown={(e) => beginDrag(e, a)}
                           onPointerUp={() => void endDrag(a)}
                           onPointerCancel={cancelLongPress}
-                          className={`drag-surface absolute left-1 right-1 overflow-hidden rounded-lg border text-[11px] shadow-sm ${
+                          className={`drag-surface absolute left-1 right-1 overflow-hidden rounded-[3px] border text-[11px] ${
                             isDragging ? 'dragging z-20' : 'z-10'
                           } ${
                             cancelled
@@ -433,8 +433,9 @@ export function CalendarBoard({
                             </p>
                             <p className="truncate text-ink-500">{a.serviceNames.join(' + ')}</p>
                             {a.allergyLabels.length > 0 && (
-                              <p className="truncate font-semibold text-rose-700">
-                                ⚠️ {a.allergyLabels.join(', ')}
+                              <p className="flex items-center gap-1 truncate font-semibold text-rose-700">
+                                <AlertTriangle size={12} strokeWidth={1.5} className="shrink-0" aria-hidden />
+                                <span className="truncate">{a.allergyLabels.join(', ')}</span>
                               </p>
                             )}
                           </div>
@@ -449,7 +450,7 @@ export function CalendarBoard({
                       a.passiveIntervals.map((iv) => (
                         <div
                           key={`sw-${a.id}-${iv.start}`}
-                          className="shadow-window pointer-events-none absolute left-1 right-1 z-0 rounded"
+                          className="shadow-window pointer-events-none absolute left-1 right-1 z-0 rounded-[2px]"
                           style={{
                             top: (iv.start - openMinute) * PPM,
                             height: (iv.end - iv.start) * PPM,
@@ -467,32 +468,38 @@ export function CalendarBoard({
 
       {/* ---------------- Detay paneli ---------------- */}
       {selected && (
-        <div className="card space-y-3">
+        <div className="card space-y-3 !p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="font-semibold">
+              <p className="font-semibold tabular-nums">
                 {timeLabel(selected.startMin)}–{timeLabel(selected.endMin)} · {selected.customerName}
               </p>
               <p className="muted">{selected.serviceNames.join(' + ')}</p>
-              <p className="mt-1 font-medium">{formatTl(selected.totalPrice)}</p>
+              <p className="mt-1 text-sm font-medium tabular-nums">{formatTl(selected.totalPrice)}</p>
               {selected.allergyLabels.length > 0 && (
-                <p className="mt-2 rounded-lg bg-rose-50 px-2 py-1 text-sm font-semibold text-rose-700">
-                  ⚠️ Alerji: {selected.allergyLabels.join(', ')}
+                <p className="mt-2 flex items-center gap-1.5 rounded-[2px] border border-rose-300 px-2 py-1 text-sm font-medium text-rose-700">
+                  <AlertTriangle size={14} strokeWidth={1.5} className="shrink-0" aria-hidden />
+                  Alerji: {selected.allergyLabels.join(', ')}
                 </p>
               )}
             </div>
-            <button type="button" className="btn-ghost" onClick={() => setSelected(null)}>
-              ✕
+            <button
+              type="button"
+              className="btn-ghost btn-sm"
+              aria-label="Kapat"
+              onClick={() => setSelected(null)}
+            >
+              <X size={16} strokeWidth={1.5} aria-hidden />
             </button>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <a href={`/admin/musteriler/${selected.customerId}`} className="btn-secondary">
+          <div className="flex flex-wrap gap-1.5">
+            <a href={`/admin/musteriler/${selected.customerId}`} className="btn-secondary btn-sm">
               CRM kartı
             </a>
             <button
               type="button"
-              className="btn bg-emerald-600 text-white hover:bg-emerald-700"
+              className="btn btn-sm border border-emerald-300 bg-white text-emerald-700 hover:bg-sand-100"
               disabled={busy || selected.status !== 'CONFIRMED'}
               onClick={() => void changeStatus(selected, 'COMPLETED')}
             >
@@ -500,7 +507,7 @@ export function CalendarBoard({
             </button>
             <button
               type="button"
-              className="btn bg-amber-600 text-white hover:bg-amber-700"
+              className="btn btn-sm border border-brass-300 bg-white text-brass-700 hover:bg-sand-100"
               disabled={busy || selected.status !== 'CONFIRMED'}
               onClick={() => void changeStatus(selected, 'NO_SHOW')}
             >
@@ -508,7 +515,7 @@ export function CalendarBoard({
             </button>
             <button
               type="button"
-              className="btn bg-rose-600 text-white hover:bg-rose-700"
+              className="btn btn-sm border border-rose-300 bg-white text-rose-700 hover:bg-sand-100"
               disabled={busy || selected.status !== 'CONFIRMED'}
               onClick={() => void changeStatus(selected, 'CANCELLED')}
             >
@@ -516,7 +523,7 @@ export function CalendarBoard({
             </button>
           </div>
 
-          <p className="muted">
+          <p className="muted text-xs">
             &quot;Tamamlandı&quot; işaretlemek stoktan sarf malzemesini düşer, sadakat puanı yazar ve
             tekrar hatırlatmasını kuyruğa alır. Aynı randevu iki kez tamamlanamaz.
           </p>

@@ -105,6 +105,9 @@ class Config:
     whatsapp_send_interval_ms: int
     #: Bir bakım çalıştırmasında en fazla gönderilecek kuyruk mesajı.
     notification_batch_size: int
+    #: Uygulama içi bildirim işçisinin kuyruğu kontrol aralığı (sn). 0: kapalı
+    #: (o durumda ``/api/cron/sweep`` dışarıdan tetiklenmelidir).
+    notification_poll_seconds: int
     #: Evolution API'nin gelen mesajları bildireceği backend adresi (Evolution
     #: konteynerinden erişilebilir olmalı). Boşsa webhook kurulmaz ve
     #: karşılama mesajı çalışmaz.
@@ -139,6 +142,7 @@ config = Config(
     whatsapp_country_code=os.getenv("WHATSAPP_COUNTRY_CODE") or "90",
     whatsapp_send_interval_ms=max(0, int(os.getenv("WHATSAPP_SEND_INTERVAL_MS") or 1500)),
     notification_batch_size=_num(os.getenv("NOTIFICATION_BATCH_SIZE"), 20),
+    notification_poll_seconds=max(0, int(os.getenv("NOTIFICATION_POLL_SECONDS") or 60)),
     evolution_webhook_url=(os.getenv("EVOLUTION_WEBHOOK_URL") or "").rstrip("/"),
     evolution_webhook_secret=os.getenv("EVOLUTION_WEBHOOK_SECRET")
     or ("" if _app_env not in DEV_ENVS else "lokal-webhook-anahtari"),

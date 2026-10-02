@@ -1,3 +1,4 @@
+import { AlertTriangle, ChevronLeft, Eye, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
@@ -77,19 +78,19 @@ interface CustomerCard {
 }
 
 const TONE_CLASS: Record<string, string> = {
-  violet: 'bg-violet-50 text-violet-700',
-  emerald: 'bg-emerald-50 text-emerald-700',
-  red: 'bg-rose-50 text-rose-700',
-  amber: 'bg-amber-50 text-amber-800',
-  sky: 'bg-sky-50 text-sky-700',
-  slate: 'bg-sand-100 text-ink-700',
+  violet: 'border border-plum-300 bg-transparent text-plum-700',
+  emerald: 'border border-emerald-300 bg-transparent text-emerald-700',
+  red: 'border border-rose-300 bg-transparent text-rose-700',
+  amber: 'border border-brass-300 bg-transparent text-brass-700',
+  sky: 'border border-sand-300 bg-transparent text-ink-700',
+  slate: 'border border-sand-200 bg-sand-100 text-ink-700',
 };
 
 const RISK_TONE: Record<string, string> = {
-  DUSUK: 'bg-emerald-50 text-emerald-700',
-  ORTA: 'bg-amber-50 text-amber-800',
-  YUKSEK: 'bg-rose-50 text-rose-700',
-  YETERSIZ_VERI: 'bg-sand-100 text-ink-500',
+  DUSUK: 'border border-emerald-300 bg-transparent text-emerald-700',
+  ORTA: 'border border-brass-300 bg-transparent text-brass-700',
+  YUKSEK: 'border border-rose-300 bg-transparent text-rose-700',
+  YETERSIZ_VERI: 'border border-sand-200 bg-sand-100 text-ink-500',
 };
 
 /**
@@ -135,40 +136,43 @@ export default async function CustomerCardPage({
   const allergies = [...card.allergies].sort((a, b) => a.id - b.id);
 
   return (
-    <div className="space-y-4">
-      <Link href="/admin/musteriler" className="text-sm font-medium text-plum-700">
-        ← Müşteri listesi
+    <div className="space-y-3">
+      <Link
+        href="/admin/musteriler"
+        className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-plum-700"
+      >
+        <ChevronLeft size={14} strokeWidth={1.5} aria-hidden /> Müşteri listesi
       </Link>
 
       {/* ---------------- Başlık ---------------- */}
-      <header className="card">
+      <header className="card !p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold">
+            <h1 className="display text-xl text-ink-900">
               {profile.firstName} {profile.lastName ?? ''}
             </h1>
-            <p className="muted">0{profile.phone}</p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <p className="muted tabular-nums">0{profile.phone}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
               <span className={`badge ${TONE_CLASS[profile.segment.tone] ?? TONE_CLASS.slate}`}>
                 {profile.segment.badge}
               </span>
-              <span className="badge bg-sand-100 text-ink-700">{profile.tier}</span>
+              <span className="badge border border-sand-200 bg-sand-100 text-ink-700">{profile.tier}</span>
               <span className={`badge ${RISK_TONE[profile.risk.label] ?? RISK_TONE.YETERSIZ_VERI}`}>
                 Risk: {profile.risk.label} ({profile.risk.score}/100)
               </span>
               <span
-                className={`badge ${profile.marketingConsent ? 'bg-emerald-50 text-emerald-700' : 'bg-sand-100 text-ink-500'}`}
+                className={`badge ${profile.marketingConsent ? 'border border-emerald-300 bg-transparent text-emerald-700' : 'border border-sand-200 bg-sand-100 text-ink-500'}`}
                 title="Tekrar hatırlatmaları yalnızca onaylı müşterilere gönderilir"
               >
                 {profile.marketingConsent ? 'İleti onayı var' : 'İleti onayı yok'}
               </span>
             </div>
             {profile.segment.warning && (
-              <p className="mt-2 text-sm text-amber-800">{profile.segment.warning}</p>
+              <p className="mt-2 text-sm text-brass-700">{profile.segment.warning}</p>
             )}
           </div>
 
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm tabular-nums">
             <dt className="muted">Toplam harcama</dt>
             <dd className="text-right font-semibold">{formatTl(profile.totalSpend)}</dd>
             <dt className="muted">Ziyaret</dt>
@@ -180,18 +184,21 @@ export default async function CustomerCardPage({
           </dl>
         </div>
 
-        <p className="mt-3 rounded-xl bg-sand-100 px-3 py-2 text-sm">
+        <p className="mt-3 rounded-[2px] bg-sand-100 px-3 py-2 text-sm">
           {profile.tierProgress.message}
         </p>
       </header>
 
       {/* ---------------- ALERJİ (kırmızı kutu) ---------------- */}
-      <section className="rounded-2xl border-2 border-rose-300 bg-rose-50 p-4">
-        <h2 className="font-semibold text-rose-800">⚠️ Alerji ve hassasiyetler</h2>
+      <section className="rounded-[4px] border border-rose-300 p-4">
+        <h2 className="eyebrow flex items-center gap-1.5 !text-rose-700">
+          <AlertTriangle size={14} strokeWidth={1.5} aria-hidden />
+          Alerji ve hassasiyetler
+        </h2>
         {allergies.length === 0 ? (
-          <p className="mt-1 text-sm text-rose-700">Kayıtlı alerji yok.</p>
+          <p className="mt-1 muted">Kayıtlı alerji yok.</p>
         ) : (
-          <ul className="mt-2 space-y-1 text-sm text-rose-800">
+          <ul className="mt-2 space-y-1 text-sm text-rose-700">
             {allergies.map((a) => (
               <li key={a.id}>
                 <strong>{a.label}</strong> ({a.severity}){a.note ? ` — ${a.note}` : ''}
@@ -206,10 +213,10 @@ export default async function CustomerCardPage({
         />
       </section>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {/* ---------------- Renk eğilimi ---------------- */}
-        <section className="card">
-          <h2 className="section-title">Renk eğilimi</h2>
+        <section className="card !p-4">
+          <h2 className="eyebrow">Renk eğilimi</h2>
           <p className="mt-1 text-sm">{profile.colors.summary}</p>
           {profile.colors.topColors.length > 0 && (
             <ul className="mt-3 space-y-2">
@@ -221,9 +228,9 @@ export default async function CustomerCardPage({
                     </span>
                     <span className="tabular-nums">%{Math.round(c.ratio * 100)}</span>
                   </div>
-                  <div className="mt-1 h-1.5 rounded-full bg-sand-200">
+                  <div className="mt-1 h-1 rounded-[1px] bg-sand-200">
                     <div
-                      className="h-full rounded-full bg-plum-500"
+                      className="h-full rounded-[1px] bg-plum-500"
                       style={{ width: `${Math.round(c.ratio * 100)}%` }}
                     />
                   </div>
@@ -237,14 +244,14 @@ export default async function CustomerCardPage({
         </section>
 
         {/* ---------------- Kampanyalar ---------------- */}
-        <section className="card">
-          <h2 className="section-title">Eşleşen kampanyalar</h2>
+        <section className="card !p-4">
+          <h2 className="eyebrow">Eşleşen kampanyalar</h2>
           {profile.campaigns.length === 0 ? (
             <p className="mt-1 muted">Bu müşteri şu an hiçbir kampanya kuralına uymuyor.</p>
           ) : (
             <ul className="mt-2 space-y-2">
               {profile.campaigns.map((c) => (
-                <li key={c.campaignId} className="rounded-xl bg-sand-100 p-3 text-sm">
+                <li key={c.campaignId} className="rounded-[2px] border border-sand-200 p-3 text-sm">
                   <p className="font-medium">
                     {c.name} —{' '}
                     {c.kind === 'DISCOUNT_PERCENT'
@@ -262,16 +269,23 @@ export default async function CustomerCardPage({
       </div>
 
       {/* ---------------- Gizli notlar ---------------- */}
-      <section className="card">
-        <h2 className="section-title">🔒 Usta notları</h2>
+      <section className="card !p-4">
+        <h2 className="eyebrow flex items-center gap-1.5">
+          <Lock size={14} strokeWidth={1.5} aria-hidden />
+          Usta notları
+        </h2>
         <p className="muted">
           &quot;Yalnızca personel&quot; notları hiçbir müşteri ekranında veya API yanıtında görünmez.
         </p>
         <ul className="mt-3 space-y-2">
           {notes.map((n) => (
-            <li key={n.id} className="rounded-xl border border-sand-200 p-3 text-sm">
+            <li key={n.id} className="rounded-[2px] border border-sand-200 p-3 text-sm">
               <p className="flex items-center gap-2">
-                <span aria-hidden>{n.visibility === 'STAFF_ONLY' ? '🔒' : '👁️'}</span>
+                {n.visibility === 'STAFF_ONLY' ? (
+                  <Lock size={14} strokeWidth={1.5} className="shrink-0 text-ink-500" aria-hidden />
+                ) : (
+                  <Eye size={14} strokeWidth={1.5} className="shrink-0 text-ink-500" aria-hidden />
+                )}
                 {n.body}
               </p>
               <p className="mt-1 muted">
@@ -286,15 +300,15 @@ export default async function CustomerCardPage({
       </section>
 
       {/* ---------------- Albüm ---------------- */}
-      <section className="card">
-        <h2 className="section-title">İşlem geçmişi albümü</h2>
+      <section className="card !p-4">
+        <h2 className="eyebrow">İşlem geçmişi albümü</h2>
         <PhotoUploader customerId={customerId} />
         {photos.length === 0 ? (
           <p className="mt-3 muted">Henüz fotoğraf yok.</p>
         ) : (
           <div className="mt-3 grid grid-cols-3 gap-2 md:grid-cols-6">
             {photos.map((p) => (
-              <figure key={p.id} className="overflow-hidden rounded-xl border border-sand-200">
+              <figure key={p.id} className="overflow-hidden rounded-[2px] border border-sand-200">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={p.imageUrl}
@@ -312,13 +326,13 @@ export default async function CustomerCardPage({
       </section>
 
       {/* ---------------- Randevu geçmişi ---------------- */}
-      <section className="card">
-        <h2 className="section-title">Randevu geçmişi</h2>
+      <section className="card !p-4">
+        <h2 className="eyebrow">Randevu geçmişi</h2>
         <ul className="mt-2 divide-y divide-sand-100">
           {appointments.map((a) => (
             <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
               <div>
-                <p className="font-medium">
+                <p className="font-medium tabular-nums">
                   {formatDateTr(a.date)} · {a.startLabel}
                 </p>
                 <p className="muted">
@@ -329,17 +343,17 @@ export default async function CustomerCardPage({
                 <span
                   className={`badge ${
                     a.status === 'COMPLETED'
-                      ? 'bg-emerald-50 text-emerald-700'
+                      ? 'border border-emerald-300 bg-transparent text-emerald-700'
                       : a.status === 'NO_SHOW'
-                        ? 'bg-rose-50 text-rose-700'
+                        ? 'border border-rose-300 bg-transparent text-rose-700'
                         : a.status === 'CANCELLED'
-                          ? 'bg-sand-100 text-ink-500'
-                          : 'bg-sky-50 text-sky-700'
+                          ? 'border border-sand-200 bg-sand-100 text-ink-500'
+                          : 'border border-sand-300 bg-transparent text-ink-700'
                   }`}
                 >
                   {a.status}
                 </span>
-                <span className="font-medium">{formatTl(a.totalPrice)}</span>
+                <span className="font-medium tabular-nums">{formatTl(a.totalPrice)}</span>
               </div>
             </li>
           ))}

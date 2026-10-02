@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-import { serverApi, type MeResponse } from '@/lib/server-api';
+import { serverApi, type MeResponse, type SalonInfo } from '@/lib/server-api';
 import { StaffLoginForm } from './staff-login-form';
 
 export const dynamic = 'force-dynamic';
@@ -13,19 +13,25 @@ export const dynamic = 'force-dynamic';
  * yönlendirme döngüsü oluşurdu.
  */
 export default async function StaffLoginPage() {
-  const me = await serverApi<MeResponse>('/api/me');
+  const [me, showcase] = await Promise.all([
+    serverApi<MeResponse>('/api/me'),
+    serverApi<{ salon: SalonInfo }>('/api/showcase'),
+  ]);
   if (me.staff) redirect('/admin');
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-4">
+    <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-6 px-4 py-8">
       <div className="text-center">
-        <h1 className="text-2xl font-semibold">Personel Paneli</h1>
-        <p className="mt-2 muted">Telefon numaran ve şifrenle giriş yap.</p>
+        <p className="eyebrow">Personel paneli</p>
+        <h1 className="display mt-2 text-3xl leading-tight text-ink-900">
+          {showcase.salon.salonName}
+        </h1>
+        <p className="muted mt-2">Telefon numaranız ve şifrenizle giriş yapın.</p>
       </div>
 
       <StaffLoginForm />
 
-      <p className="text-center text-xs text-ink-500">
+      <p className="text-center text-xs text-ink-400">
         Demo: <strong>05551110001</strong> / <strong>admin123</strong>
       </p>
     </div>

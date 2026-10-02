@@ -1,3 +1,5 @@
+import { Star } from 'lucide-react';
+
 import { Stars } from '@/components/marketing/Stars';
 import { adminApi } from '@/lib/admin-api';
 import type { ReviewSummary } from '@/lib/server-api';
@@ -46,34 +48,31 @@ export default async function AdminReviewsPage() {
     await adminApi<AdminReviewsResponse>('/api/admin/reviews');
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="section-title">Yorumlar</h1>
-        <p className="muted">Son 100 yorum gösteriliyor</p>
-      </div>
-
+    <div className="space-y-3">
       {/* Özet */}
-      <div className="card flex flex-wrap items-center gap-x-8 gap-y-3">
+      <div className="card flex flex-wrap items-center gap-x-8 gap-y-3 !p-4">
         <div>
-          <p className="text-2xl font-semibold text-plum-700">
+          <p className="display text-2xl tabular-nums text-plum-700">
             {summary.average?.toFixed(2).replace('.', ',') ?? '—'}
           </p>
           <p className="muted">ortalama puan</p>
         </div>
         <div>
-          <p className="text-2xl font-semibold">{summary.count}</p>
+          <p className="display text-2xl tabular-nums">{summary.count}</p>
           <p className="muted">yayındaki yorum</p>
         </div>
         <div>
-          <p className="text-2xl font-semibold">%{Math.round(summary.positiveRate * 100)}</p>
-          <p className="muted">4★ ve üzeri</p>
+          <p className="display text-2xl tabular-nums">%{Math.round(summary.positiveRate * 100)}</p>
+          <p className="muted flex items-center gap-1">
+            4 <Star size={12} strokeWidth={1.5} aria-hidden /> ve üzeri
+          </p>
         </div>
         {pendingCount > 0 && (
-          <div className="rounded-xl bg-amber-50 px-4 py-2">
-            <p className="text-sm font-semibold text-amber-800">
+          <div className="rounded-[2px] border border-brass-300 px-3 py-2">
+            <p className="text-sm font-semibold text-brass-700">
               {pendingCount} düşük puanlı yorum yanıtsız
             </p>
-            <p className="text-xs text-amber-700">
+            <p className="text-xs text-ink-500">
               Yanıt vermek, okuyanlar için puandan daha çok şey anlatır.
             </p>
           </div>
@@ -81,17 +80,17 @@ export default async function AdminReviewsPage() {
       </div>
 
       {reviews.length === 0 ? (
-        <p className="card muted">Henüz yorum yok.</p>
+        <p className="card muted !p-4">Henüz yorum yok.</p>
       ) : (
-        <ul className="grid gap-3 lg:grid-cols-2">
+        <ul className="grid gap-2 lg:grid-cols-2">
           {reviews.map((review) => (
             <li
               key={review.id}
-              className={`card ${review.isPublished ? '' : 'opacity-60'}`}
+              className={`card !p-4 ${review.isPublished ? '' : 'opacity-60'}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-medium">{review.authorName}</p>
+                  <p className="text-sm font-medium text-ink-900">{review.authorName}</p>
                   <div className="mt-1 flex items-center gap-2">
                     <Stars value={review.rating} size="sm" />
                     <span className="text-xs text-ink-500">
@@ -102,27 +101,27 @@ export default async function AdminReviewsPage() {
 
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   {!review.isPublished && (
-                    <span className="badge bg-rose-50 text-rose-700">Yayında değil</span>
+                    <span className="badge border border-rose-300 bg-transparent text-rose-700">Yayında değil</span>
                   )}
                   {review.isFeatured && (
-                    <span className="badge bg-plum-100 text-plum-700">Öne çıkan</span>
+                    <span className="badge border border-plum-300 bg-transparent text-plum-700">Öne çıkan</span>
                   )}
                   {review.isVerified && (
-                    <span className="badge bg-emerald-50 text-emerald-700">Doğrulanmış</span>
+                    <span className="badge border border-emerald-300 bg-transparent text-emerald-700">Doğrulanmış</span>
                   )}
                 </div>
               </div>
 
-              <p className="mt-3 text-sm leading-relaxed text-ink-700">{review.comment}</p>
+              <p className="mt-2 text-sm leading-relaxed text-ink-700">{review.comment}</p>
 
-              <p className="muted mt-2">
+              <p className="muted mt-2 text-xs">
                 {review.serviceNames}
                 {review.staffName && ` · ${review.staffName}`}
                 {review.appointmentDate && ` · ${formatDateTr(review.appointmentDate)} randevusu`}
               </p>
 
               {review.reply && (
-                <p className="mt-2 rounded-xl bg-sand-50 p-3 text-xs leading-relaxed text-ink-700">
+                <p className="mt-2 rounded-[2px] border border-sand-200 bg-sand-50 p-3 text-xs leading-relaxed text-ink-700">
                   <span className="font-semibold text-plum-700">Yanıtınız: </span>
                   {review.reply}
                 </p>

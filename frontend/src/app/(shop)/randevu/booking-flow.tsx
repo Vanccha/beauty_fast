@@ -1221,9 +1221,10 @@ export function BookingFlow({
                         >
                           <span className="font-semibold tabular-nums">{slot.label}</span>
                           <span
-                            className={`text-[10px] ${active ? 'text-plum-100' : 'text-ink-500'}`}
+                            className={`text-[13px] font-medium tabular-nums ${active ? 'text-plum-100' : 'text-ink-500'}`}
+                            aria-label={`bitiş ${slot.endLabel}`}
                           >
-                            {slot.endLabel}'e kadar
+                            {slot.endLabel}
                           </span>
                           <span className="mt-1 flex flex-wrap justify-center gap-0.5">
                             {slot.heldByYou && (
@@ -1237,6 +1238,7 @@ export function BookingFlow({
                             <OpportunityBadge
                               discountRate={slot.discountRate}
                               label={slot.opportunityLabel}
+                              compact
                             />
                             <ViewCountBadge count={slot.viewCount} optIn={engagementOptIn} />
                           </span>

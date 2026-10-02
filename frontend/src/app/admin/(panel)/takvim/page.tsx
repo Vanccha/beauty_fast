@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
 import { adminApi } from '@/lib/admin-api';
@@ -98,18 +99,18 @@ export default async function CalendarPage({
   }));
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="section-title">{formatDateTr(date)}</h1>
-        <div className="flex items-center gap-2">
-          <Link href={`/admin/takvim?tarih=${addDaysToKey(date, -1)}`} className="btn-secondary">
-            ← Önceki
+        <p className="eyebrow">{formatDateTr(date)}</p>
+        <div className="flex items-center gap-1.5">
+          <Link href={`/admin/takvim?tarih=${addDaysToKey(date, -1)}`} className="btn-secondary btn-sm">
+            <ChevronLeft size={14} strokeWidth={1.5} aria-hidden /> Önceki
           </Link>
-          <Link href="/admin/takvim" className="btn-secondary">
+          <Link href="/admin/takvim" className="btn-secondary btn-sm">
             Bugün
           </Link>
-          <Link href={`/admin/takvim?tarih=${addDaysToKey(date, 1)}`} className="btn-secondary">
-            Sonraki →
+          <Link href={`/admin/takvim?tarih=${addDaysToKey(date, 1)}`} className="btn-secondary btn-sm">
+            Sonraki <ChevronRight size={14} strokeWidth={1.5} aria-hidden />
           </Link>
         </div>
       </div>

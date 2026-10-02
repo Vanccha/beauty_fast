@@ -32,6 +32,8 @@ os.environ["CRON_SECRET"] = "test-cron-secret-" + "x" * 32
 # Testler asla gercek mesaj gondermez; WhatsApp testleri sahte sunucu kullanir.
 os.environ["NOTIFICATION_DRIVER"] = "console"
 os.environ["WHATSAPP_SEND_INTERVAL_MS"] = "0"
+# Arka plan bildirim iscisi testlerde calismaz; kuyruk testleri elle bosaltir.
+os.environ["NOTIFICATION_POLL_SECONDS"] = "0"
 # Gelistiricinin lokal .env'indeki Evolution ayarlari testlere sizmasin.
 for _key in (
     "EVOLUTION_API_URL", "EVOLUTION_API_KEY", "EVOLUTION_INSTANCE", "EVOLUTION_WEBHOOK_URL",
