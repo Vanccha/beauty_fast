@@ -170,14 +170,14 @@ arayüz tarafındaki tamamlayıcısıdır.
 
 ## PWA (mobil / tablet uygulaması)
 
-Site telefona ve tablete "uygulama" olarak yüklenebilir (Android/Chrome: **Yükle** önerisi; iOS/iPadOS Safari: **Paylaş → Ana Ekrana Ekle**).
+Site telefona ve tablete "uygulama" olarak yüklenebilir Üst barda sabit **Uygulamayı yükle** düğmesi vardır (Android/Chrome/Edge: tarayıcının yükleme penceresini açar; iOS/iPadOS Safari: **Paylaş → Ana Ekrana Ekle** adımlarını gösterir).
 
 | Dosya | Görev |
 | --- | --- |
 | `src/app/manifest.ts` | Uygulama bildirimi (ad, renkler, simgeler, kısayollar) |
 | `public/sw.js` | Service worker — önbellek stratejileri dosyanın başında açıklanmıştır |
 | `src/app/offline/` | Bağlantı yokken gösterilen sayfa |
-| `src/components/pwa/` | SW kaydı, "ana ekrana ekle" önerisi |
+| `src/components/pwa/` | SW kaydı, "Uygulamayı yükle" düğmeleri (`InstallButton.tsx`) |
 | `public/icons/icon.svg` | Simge kaynağı → `npm run icons` ile PNG'ler üretilir |
 
 - Service worker **yalnızca `npm run build && npm start`** ile çalışır; `npm run dev` altında kaydedilmez.

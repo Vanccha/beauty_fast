@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-import { InstallButton } from '@/components/pwa/InstallBanner';
+import { InstallButton } from '@/components/pwa/InstallButton';
 import { serverApi, type MeResponse, type SalonInfo } from '@/lib/server-api';
 import { AdminNavLink, StaffLogout } from './nav';
 import type { MessagingStatus } from './whatsapp/whatsapp-connect';

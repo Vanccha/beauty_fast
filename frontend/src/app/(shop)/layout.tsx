@@ -1,6 +1,5 @@
 import Link from 'next/link';
 
-import { InstallBanner } from '@/components/pwa/InstallBanner';
 import { serverApi, type MeResponse, type SalonInfo } from '@/lib/server-api';
 import { NavLink } from './nav-link';
 import { SiteHeader } from './site-header';
@@ -121,8 +120,6 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
           ))}
         </div>
       </nav>
-
-      <InstallBanner appName={branch.salon.name} />
     </div>
   );
 }

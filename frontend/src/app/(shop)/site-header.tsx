@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+import { SiteInstallButton } from '@/components/pwa/InstallButton';
+
 /**
  * Üst bar.
  *
@@ -85,6 +87,8 @@ export function SiteHeader({
         </nav>
 
         <div className="flex items-center gap-2">
+          <SiteInstallButton transparent={transparent} />
+
           {customerName ? (
             <Link
               href="/hesabim"
