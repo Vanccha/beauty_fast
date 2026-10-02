@@ -171,10 +171,10 @@ export default async function ReviewsPage({
       <div className="card bg-sand-100 text-center">
         <p className="display text-2xl">Sen de değerlendirmek ister misin?</p>
         <p className="muted mx-auto mt-1 max-w-md">
-          Tamamlanan randevularına Hesabım sayfasından puan verebilir, yorumunu yazabilirsin.
+          Tamamlanan randevularına Randevu Sorgula sayfasından puan verebilir, yorumunu yazabilirsin.
         </p>
-        <Link href="/hesabim" className="btn-primary mt-4">
-          Hesabıma git
+        <Link href="/randevularim" className="btn-primary mt-4">
+          Randevularıma git
         </Link>
       </div>
     </div>

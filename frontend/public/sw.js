@@ -11,7 +11,7 @@
  *   Sayfa gezintileri               → önce ağ; ağ yoksa önbellekteki kopya,
  *                                     o da yoksa /offline.
  *
- * Kişisel sayfalar (/hesabim, /giris, /randevu) ve personel paneli (/admin)
+ * Kişisel sayfalar (/randevularim, /hesabim, /giris, /randevu) ve personel paneli (/admin)
  * ÖNBELLEĞE ALINMAZ — paylaşılan bir tablette başka birinin bilgisi
  * görünmesin; çevrimdışıyken bunların yerine doğrudan /offline açılır.
  *

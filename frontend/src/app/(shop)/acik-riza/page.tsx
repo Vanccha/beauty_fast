@@ -24,7 +24,7 @@ export default async function ConsentPage() {
         Aşağıdaki iki onay birbirinden bağımsızdır ve <strong>isteğe bağlıdır</strong>. Onay
         vermemeniz randevu almanızı veya hizmetlerimizden yararlanmanızı engellemez. Verdiğiniz
         onayı dilediğiniz zaman, gerekçe göstermeden{' '}
-        <Link href="/hesabim#gizlilik">Hesabım → Gizlilik ve verilerim</Link> bölümünden geri
+        <Link href="/randevularim#gizlilik">Randevu Sorgula → Kişisel verilerim ve verilerim</Link> bölümünden geri
         alabilirsiniz. Verilerinizin nasıl işlendiğine ilişkin ayrıntılar{' '}
         <Link href="/kvkk">KVKK Aydınlatma Metni</Link>&apos;nde yer alır.
       </p>
@@ -43,7 +43,7 @@ export default async function ConsentPage() {
           ilgili bilgilendirme olduğu için onay vermeseniz de gönderilir.
         </li>
         <li>
-          Onayınızı Hesabım sayfasından geri alabilirsiniz. Geri aldığınız anda bekleyen
+          Onayınızı Randevu Sorgula sayfasından geri alabilirsiniz. Geri aldığınız anda bekleyen
           hatırlatmalar iptal edilir.
         </li>
       </ul>

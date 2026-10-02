@@ -1,4 +1,4 @@
-import { CalendarDays, House, Images, UserRound } from 'lucide-react';
+import { CalendarDays, House, Images, CalendarSearch } from 'lucide-react';
 import Link from 'next/link';
 
 import { serverApi, type MeResponse, type SalonInfo } from '@/lib/server-api';
@@ -33,7 +33,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
     { href: '/', label: 'Ana Sayfa', icon: <House size={20} strokeWidth={1.5} /> },
     { href: '/randevu', label: 'Randevu', icon: <CalendarDays size={20} strokeWidth={1.5} /> },
     { href: '/portfolyo', label: 'Portfolyo', icon: <Images size={20} strokeWidth={1.5} /> },
-    { href: '/hesabim', label: 'Hesabım', icon: <UserRound size={20} strokeWidth={1.5} /> },
+    { href: '/randevularim', label: 'Randevularım', icon: <CalendarSearch size={20} strokeWidth={1.5} /> },
   ];
 
   // Üst barda gösterilen ama alt çubuğa sığmayan ek sayfalar.

@@ -56,6 +56,7 @@ export default async function BookingPage({
       categories={categories}
       services={services}
       isMember={Boolean(customer)}
+      customerName={customer && customer.firstName !== 'Yeni Üye' ? customer.firstName : null}
       engagementOptIn={customer?.engagementOptIn ?? true}
       initialServiceIds={initialServiceIds}
       initialCategoryId={initialCategoryId}

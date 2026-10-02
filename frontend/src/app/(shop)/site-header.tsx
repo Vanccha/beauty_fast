@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UserRound } from 'lucide-react';
+import { CalendarSearch } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { SiteInstallButton } from '@/components/pwa/InstallButton';
@@ -60,7 +60,7 @@ export function SiteHeader({
         <nav className="hidden items-center gap-5 lg:flex xl:gap-7">
           {links.map((link) => {
             const active =
-              link.href === '/' ? pathname === '/' : pathname.startsWith(link.href);
+              link.href === '/' ? pathname === '/' : pathname === link.href || pathname.startsWith(`${link.href}/`);
             return (
               <Link
                 key={link.href}
@@ -88,14 +88,14 @@ export function SiteHeader({
           <SiteInstallButton transparent={transparent} />
 
           <Link
-            href={customerName ? '/hesabim' : '/giris'}
-            aria-label={customerName ?? 'Üye Girişi'}
+            href="/randevularim"
+            aria-label="Randevu Sorgula"
             className={`touch-target hidden items-center justify-center gap-2 rounded-[2px] px-3 text-xs font-semibold uppercase tracking-[0.14em] whitespace-nowrap transition-colors md:inline-flex ${
               transparent ? 'text-white hover:bg-white/15' : 'text-ink-700 hover:bg-sand-100'
             }`}
           >
-            <UserRound size={18} strokeWidth={1.5} aria-hidden />
-            <span className="hidden xl:inline">{customerName ?? 'Üye Girişi'}</span>
+            <CalendarSearch size={18} strokeWidth={1.5} aria-hidden />
+            <span className="hidden xl:inline">Randevu Sorgula</span>
           </Link>
 
           <Link href="/randevu" className={`btn-sm ${transparent ? 'btn-light' : 'btn-primary'}`}>

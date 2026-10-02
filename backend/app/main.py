@@ -34,7 +34,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import admin, appointments, auth, catalog, privacy, public, slots, webhooks
+from .api import admin, appointments, auth, catalog, group_booking, privacy, public, slots, webhooks
 from .config import config, validate_config
 from .db import init_db
 from .errors import AppError
@@ -112,6 +112,7 @@ app.include_router(public.router)
 app.include_router(privacy.router)
 app.include_router(catalog.router)
 app.include_router(slots.router)
+app.include_router(group_booking.router)
 app.include_router(appointments.router)
 app.include_router(admin.router)
 app.include_router(webhooks.router)

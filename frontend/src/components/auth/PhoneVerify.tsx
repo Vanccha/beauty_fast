@@ -2,10 +2,19 @@
 
 import { ArrowLeft, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { ApiError, apiSend } from '@/lib/api-client';
+
+export interface VerifiedCustomer {
+  id: number;
+  firstName: string;
+  lastName: string | null;
+  phone: string;
+  tier: string;
+  loyaltyPoints: number;
+  engagementOptIn: boolean;
+}
 
 interface SendResult {
   phone: string;
@@ -13,54 +22,72 @@ interface SendResult {
   devCode?: string;
 }
 
-/**
- * Telefon + OTP giriş akışı.
- *
- * `devCode` yalnızca geliştirmede döner (`NODE_ENV !== 'production'`);
- * varsa kutuya otomatik yazılır ki demo sırasında konsola bakmaya gerek
- * kalmasın.
- *
- * KVKK: aydınlatma metni bağlantısı numara girilirken gösterilir (veri
- * toplanmadan önce). Ticari ileti onayı AYRI ve İSTEĞE BAĞLI bir kutudur,
- * varsayılan olarak işaretsizdir; girişin şartı değildir.
- */
-export function LoginForm({ nextUrl }: { nextUrl: string }) {
-  const router = useRouter();
+const PLACEHOLDER_NAME = 'Yeni Üye';
+const RESEND_SECONDS = 45;
 
-  const [step, setStep] = useState<'phone' | 'code'>('phone');
+/**
+ * Telefon → WhatsApp kodu → (yalnızca yeni numaraysa) ad adımı.
+ *
+ * Kod önce adsız doğrulanır; kod tüketildiği için ad, oturum açıldıktan
+ * sonra `PATCH /api/me` ile kaydedilir. Telefonda gerçek bir ad zaten
+ * kayıtlıysa ad ASLA tekrar sorulmaz.
+ *
+ * `devCode` yalnızca geliştirmede döner; varsa kutuya otomatik yazılır.
+ *
+ * KVKK: aydınlatma metni bağlantısı numara girilirken gösterilir. Ticari
+ * ileti onayı AYRI, İSTEĞE BAĞLI ve varsayılan işaretsizdir.
+ */
+export function PhoneVerify({
+  onVerified,
+  title,
+  description,
+  compact = false,
+}: {
+  onVerified: (customer: VerifiedCustomer) => void;
+  title?: string;
+  description?: string;
+  compact?: boolean;
+}) {
+  const [step, setStep] = useState<'phone' | 'code' | 'name'>('phone');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [firstName, setFirstName] = useState('');
   const [marketingConsent, setMarketingConsent] = useState(false);
-  const [needsName, setNeedsName] = useState(false);
   const [sent, setSent] = useState<SendResult | null>(null);
+  const [verified, setVerified] = useState<VerifiedCustomer | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [resendLeft, setResendLeft] = useState(0);
 
   // Kodun kalan geçerlilik süresi
   useEffect(() => {
     if (!sent) return;
     const tick = () => {
-      const remaining = Math.max(
-        0,
-        Math.floor((new Date(sent.expiresAt).getTime() - Date.now()) / 1000),
+      setSecondsLeft(
+        Math.max(0, Math.floor((new Date(sent.expiresAt).getTime() - Date.now()) / 1000)),
       );
-      setSecondsLeft(remaining);
     };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [sent]);
 
-  async function handleSend(event: React.FormEvent) {
-    event.preventDefault();
+  // Yeniden gönder geri sayımı
+  useEffect(() => {
+    if (resendLeft <= 0) return;
+    const id = setTimeout(() => setResendLeft((s) => s - 1), 1000);
+    return () => clearTimeout(id);
+  }, [resendLeft]);
+
+  async function sendCode() {
     setError(null);
     setBusy(true);
     try {
       const result = await apiSend<SendResult>('/api/auth/otp/send', 'POST', { phone });
       setSent(result);
       setCode(result.devCode ?? '');
+      setResendLeft(RESEND_SECONDS);
       setStep('code');
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Kod gönderilemedi.');
@@ -69,25 +96,27 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
     }
   }
 
+  async function handleSend(event: React.FormEvent) {
+    event.preventDefault();
+    await sendCode();
+  }
+
   async function handleVerify(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      const result = await apiSend<{ isNewCustomer: boolean }>('/api/auth/otp/verify', 'POST', {
-        phone,
-        code,
-        firstName: firstName || undefined,
-        marketingConsent,
-      });
-
-      // Yeni üye adını girmediyse önce adını iste, sonra devam et.
-      if (result.isNewCustomer && !firstName) {
-        setNeedsName(true);
-        return;
+      const result = await apiSend<{ isNewCustomer: boolean; customer: VerifiedCustomer }>(
+        '/api/auth/otp/verify',
+        'POST',
+        { phone, code, marketingConsent },
+      );
+      setVerified(result.customer);
+      if (result.isNewCustomer || result.customer.firstName === PLACEHOLDER_NAME) {
+        setStep('name');
+      } else {
+        onVerified(result.customer);
       }
-      router.push(nextUrl);
-      router.refresh();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Doğrulama başarısız.');
     } finally {
@@ -97,57 +126,83 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
 
   async function handleName(event: React.FormEvent) {
     event.preventDefault();
+    if (!verified) return;
+    setError(null);
     setBusy(true);
     try {
-      await apiSend('/api/auth/otp/verify', 'POST', { phone, code, firstName, marketingConsent });
-      router.push(nextUrl);
-      router.refresh();
-    } catch {
-      // Kod tüketilmişse profil adı sonradan hesap sayfasından girilebilir.
-      router.push(nextUrl);
-      router.refresh();
+      const updated = await apiSend<VerifiedCustomer>('/api/me', 'PATCH', {
+        firstName: firstName.trim(),
+      });
+      onVerified({ ...verified, ...updated });
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Ad kaydedilemedi.');
     } finally {
       setBusy(false);
     }
   }
 
-  if (needsName) {
-    return (
-      <form onSubmit={handleName} className="card space-y-5">
+  const errorBox = error && (
+    <div className="alert alert-danger" role="alert">
+      <TriangleAlert size={16} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+      <p>{error}</p>
+    </div>
+  );
+
+  const header = (title || description) && (
+    <div className={compact ? '' : 'text-center'}>
+      {title && <h1 className={compact ? 'display text-xl' : 'display text-4xl'}>{title}</h1>}
+      {description && <p className="muted mt-2">{description}</p>}
+    </div>
+  );
+
+  const wrap = (children: React.ReactNode) => (
+    <div className={compact ? 'space-y-4' : 'mx-auto w-full max-w-md space-y-6'}>
+      {header}
+      {children}
+    </div>
+  );
+
+  if (step === 'name') {
+    return wrap(
+      <form onSubmit={handleName} className={compact ? 'space-y-4' : 'card space-y-5'}>
+        <p className="muted">Numaran doğrulandı. Sana nasıl hitap edelim?</p>
         <div>
-          <label className="label" htmlFor="firstName">
+          <label className="label" htmlFor="pv-firstName">
             Adın
           </label>
           <input
-            id="firstName"
+            id="pv-firstName"
             className="field"
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
             placeholder="Ayşe"
+            maxLength={40}
+            autoComplete="given-name"
             autoFocus
             required
           />
         </div>
-        <button className="btn-primary w-full" disabled={busy}>
+        {errorBox}
+        <button className="btn-primary w-full" disabled={busy || firstName.trim().length < 1}>
           Devam et
         </button>
-      </form>
+      </form>,
     );
   }
 
   if (step === 'code') {
-    return (
-      <form onSubmit={handleVerify} className="card space-y-5">
+    return wrap(
+      <form onSubmit={handleVerify} className={compact ? 'space-y-4' : 'card space-y-5'}>
         <p className="muted">
           <strong>0{sent?.phone}</strong> numarasına WhatsApp üzerinden gönderilen 6 haneli kodu gir.
         </p>
 
         <div>
-          <label className="label" htmlFor="code">
+          <label className="label" htmlFor="pv-code">
             Doğrulama kodu
           </label>
           <input
-            id="code"
+            id="pv-code"
             className="field text-center text-2xl tabular-nums tracking-[0.4em]"
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -161,23 +216,17 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
 
         {sent?.devCode && (
           <p className="alert alert-warning text-xs">
-            Geliştirme modu: kod <strong>{sent.devCode}</strong> (sunucu log'una da
-            yazıldı).
+            Geliştirme modu: kod <strong>{sent.devCode}</strong> (sunucu log&apos;una da yazıldı).
           </p>
         )}
 
-        {error && (
-          <div className="alert alert-danger" role="alert">
-            <TriangleAlert size={16} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
-            <p>{error}</p>
-          </div>
-        )}
+        {errorBox}
 
         <button className="btn-primary w-full" disabled={busy || code.length < 4}>
-          Giriş yap
+          Doğrula
         </button>
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <button
             type="button"
             className="btn-link"
@@ -195,25 +244,34 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
               : 'Kodun süresi doldu'}
           </span>
         </div>
-      </form>
+
+        <button
+          type="button"
+          className="btn-link"
+          disabled={busy || resendLeft > 0}
+          onClick={() => void sendCode()}
+        >
+          {resendLeft > 0 ? `Kodu tekrar gönder (${resendLeft} sn)` : 'Kodu tekrar gönder'}
+        </button>
+      </form>,
     );
   }
 
-  return (
-    <form onSubmit={handleSend} className="card space-y-5">
+  return wrap(
+    <form onSubmit={handleSend} className={compact ? 'space-y-4' : 'card space-y-5'}>
       <div>
-        <label className="label" htmlFor="phone">
+        <label className="label" htmlFor="pv-phone">
           Cep telefonu
         </label>
         <input
-          id="phone"
+          id="pv-phone"
           className="field"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           inputMode="tel"
           autoComplete="tel"
           placeholder="0532 000 00 00"
-          autoFocus
+          autoFocus={!compact}
           required
         />
       </div>
@@ -237,25 +295,19 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
         </span>
       </label>
 
-      {error && (
-        <div className="alert alert-danger" role="alert">
-          <TriangleAlert size={16} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
-          <p>{error}</p>
-        </div>
-      )}
+      {errorBox}
 
       <button className="btn-primary w-full" disabled={busy || phone.replace(/\D/g, '').length < 10}>
         Kod gönder
       </button>
 
       <p className="text-xs leading-relaxed text-ink-500">
-        Giriş için telefon numaran ve adın işlenir; doğrulama kodu WhatsApp ile gönderilir.
-        Ayrıntılar:{' '}
+        Telefon numaran ve adın işlenir; doğrulama kodu WhatsApp ile gönderilir. Ayrıntılar:{' '}
         <Link href="/kvkk" target="_blank" className="underline">
           KVKK Aydınlatma Metni
         </Link>
         .
       </p>
-    </form>
+    </form>,
   );
 }

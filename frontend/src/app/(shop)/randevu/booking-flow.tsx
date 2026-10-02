@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Check, CircleAlert, CircleCheck, TriangleAlert } from 'lucide-react';
+import { Check, CircleAlert, CircleCheck, TriangleAlert, UserRound } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -19,6 +19,8 @@ import {
   formatTl,
 } from '@/lib/api-client';
 import { CategoryIcon } from '@/components/marketing/CategoryIcon';
+import { NameEditor } from '@/components/auth/NameEditor';
+import { PhoneVerify, type VerifiedCustomer } from '@/components/auth/PhoneVerify';
 
 /* ------------------------------------------------------------------ */
 /* Tipler — API sözleşmesinin istemci tarafı karşılığı                 */
@@ -157,6 +159,25 @@ function dayChipLabel(key: string): { weekday: string; day: string } {
   };
 }
 
+/** "Kimin için?" seçimi (Grup ayrı sayfadır, burada tutulmaz). */
+type BookingMode = 'self' | 'other';
+
+/** Girilen telefonu 10 haneli 5XXXXXXXXX biçimine çevirir (geçersizse null). */
+function normalizePhone(raw: string): string | null {
+  let d = raw.replace(/\D/g, '');
+  if (d.startsWith('90') && d.length === 12) d = d.slice(2);
+  else if (d.startsWith('0') && d.length === 11) d = d.slice(1);
+  return /^5\d{9}$/.test(d) ? d : null;
+}
+
+const NAME_RE = /^\p{L}[\p{L} '’-]{0,39}$/u;
+
+function validName(raw: string): boolean {
+  return NAME_RE.test(raw.trim());
+}
+
+const RATE_LIMIT_TEXT = 'Çok fazla deneme yaptın. Lütfen biraz bekleyip tekrar dene.';
+
 /** Kilit alınamadığında kullanıcıya gösterilecek metin. */
 function lockErrorMessage(e: unknown): string {
   if (e instanceof ApiError && e.code === 'SLOT_TAKEN') {
@@ -165,6 +186,7 @@ function lockErrorMessage(e: unknown): string {
       ? `Bu saat az önce alındı; ${new Date(heldUntil).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}'e kadar rezerve.`
       : 'Bu saat az önce başka bir müşteri tarafından alındı.';
   }
+  if (e instanceof ApiError && e.code === 'RATE_LIMITED') return RATE_LIMIT_TEXT;
   return e instanceof ApiError ? e.message : 'Saat rezerve edilemedi.';
 }
 
@@ -199,7 +221,8 @@ const SLOT_LOST_CODES = new Set([
  * kullanıcıya yeniden eklemesi hatırlatılır.
  */
 interface BookingDraft {
-  v: 1;
+  /** 1: eski taslak (mode yok → 'self'), 2: mode + alıcı bilgisi var. */
+  v: 1 | 2;
   savedAt: number;
   serviceIds: number[];
   staffId: number | null;
@@ -210,6 +233,9 @@ interface BookingDraft {
   notes: string;
   designLink: string;
   hadDesignFile: boolean;
+  mode?: BookingMode;
+  recipientName?: string;
+  recipientPhone?: string;
 }
 
 const DRAFT_KEY = 'randevu-taslak-v1';
@@ -221,7 +247,7 @@ function readDraft(): BookingDraft | null {
     const raw = window.sessionStorage.getItem(DRAFT_KEY);
     if (!raw) return null;
     const draft = JSON.parse(raw) as BookingDraft;
-    if (draft.v !== 1 || Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS) return null;
+    if ((draft.v !== 1 && draft.v !== 2) || Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS) return null;
     return draft;
   } catch {
     return null;
@@ -232,7 +258,7 @@ function writeDraft(draft: Omit<BookingDraft, 'v' | 'savedAt'>) {
   try {
     const compact: BookingDraft = {
       ...draft,
-      v: 1,
+      v: 2,
       savedAt: Date.now(),
       // Slot listesi saklanmaz: dönüşte zaten yeniden sorgulanır.
       chosen: draft.chosen ? { ...draft.chosen, staff: { ...draft.chosen.staff, slots: [] } } : null,
@@ -257,6 +283,7 @@ export function BookingFlow({
   categories,
   services,
   isMember,
+  customerName,
   engagementOptIn,
   initialServiceIds,
   initialCategoryId,
@@ -265,6 +292,8 @@ export function BookingFlow({
   categories: Category[];
   services: Service[];
   isMember: boolean;
+  /** Oturum açık müşterinin adı (yoksa null). */
+  customerName: string | null;
   engagementOptIn: boolean;
   initialServiceIds: number[];
   initialCategoryId: number | null;
@@ -272,6 +301,13 @@ export function BookingFlow({
   resumeRequested: boolean;
 }) {
   const router = useRouter();
+
+  /** Doğrulama sayfa içinde yapılır; sunucu prop'u yalnızca başlangıç değeridir. */
+  const [member, setMember] = useState(isMember);
+  const [memberName, setMemberName] = useState<string | null>(customerName);
+  const [mode, setMode] = useState<BookingMode>('self');
+  const [recipientName, setRecipientName] = useState('');
+  const [recipientPhone, setRecipientPhone] = useState('');
 
   const [step, setStep] = useState<Step>(initialServiceIds.length ? 2 : 1);
   const [activeCategory, setActiveCategory] = useState<number | null>(
@@ -312,7 +348,23 @@ export function BookingFlow({
     allergyWarnings: { label: string; severity: string; note: string | null }[];
     savedMin: number;
     designUploadFailed: boolean;
+    forName: string | null;
   } | null>(null);
+
+  const recipientPhoneNorm = normalizePhone(recipientPhone);
+  const recipientValid = validName(recipientName) && recipientPhoneNorm !== null;
+  /** Sunucuya gidecek alıcı (yalnızca "Başkası adına" modunda). */
+  const beneficiary =
+    mode === 'other' && recipientPhoneNorm
+      ? { firstName: recipientName.trim(), phone: recipientPhoneNorm }
+      : undefined;
+
+  function handleVerified(c: VerifiedCustomer) {
+    setMember(true);
+    setMemberName(c.firstName);
+    setError(null);
+    router.refresh();
+  }
 
   const selectedServices = useMemo(
     () => selectedIds.map((id) => services.find((s) => s.id === id)!).filter(Boolean),
@@ -327,10 +379,6 @@ export function BookingFlow({
   const naiveTotalPrice = selectedServices.reduce((sum, s) => sum + s.price, 0);
 
   const days = useMemo(() => Array.from({ length: DAY_WINDOW }, (_, i) => dateKey(i)), []);
-
-  const loginHref = `/giris?next=${encodeURIComponent(
-    `/randevu?resume=1&services=${selectedIds.join(',')}`,
-  )}`;
 
   /* ---------------- Müsaitlik sorgusu ---------------- */
 
@@ -399,6 +447,14 @@ export function BookingFlow({
     const restoredDate = draft.date >= today ? draft.date : today;
     const sameDate = restoredDate === draft.date;
 
+    const draftMode: BookingMode = draft.mode === 'other' ? 'other' : 'self';
+    const draftBeneficiary =
+      draftMode === 'other' && draft.recipientPhone
+        ? { firstName: draft.recipientName ?? '', phone: draft.recipientPhone }
+        : undefined;
+    setMode(draftMode);
+    setRecipientName(draft.recipientName ?? '');
+    setRecipientPhone(draft.recipientPhone ?? '');
     setSelectedIds(draft.serviceIds);
     setStaffId(draft.staffId);
     setDate(restoredDate);
@@ -444,6 +500,7 @@ export function BookingFlow({
             serviceIds: draft.serviceIds,
             staffId: draftChosen.staff.staffId,
             startMin: draftChosen.slot.startMin,
+            beneficiary: draftBeneficiary,
           });
           if (cancelled) return;
           setChosen(draftChosen);
@@ -496,6 +553,9 @@ export function BookingFlow({
       notes,
       designLink,
       hadDesignFile: designFile !== null || lostDesignFile,
+      mode,
+      recipientName,
+      recipientPhone,
     });
   }, [
     hydrated,
@@ -510,6 +570,9 @@ export function BookingFlow({
     designLink,
     designFile,
     lostDesignFile,
+    mode,
+    recipientName,
+    recipientPhone,
   ]);
 
   /* ---------------- Kilit geri sayımı ---------------- */
@@ -626,10 +689,18 @@ export function BookingFlow({
         serviceIds: selectedIds,
         staffId: chosen.staff.staffId,
         startMin: chosen.slot.startMin,
+        beneficiary,
       });
       setLock(result);
       setStep(4);
     } catch (e) {
+      if (e instanceof ApiError && e.code === 'MEMBERSHIP_REQUIRED') {
+        // Oturum düşmüş: tekrar doğrulat (seçimler korunur).
+        setMember(false);
+        setStep(1);
+        setError('Başkası adına randevu için önce kendi numaranı doğrulaman gerekiyor.');
+        return;
+      }
       setError(lockErrorMessage(e));
       if (e instanceof ApiError && SLOT_LOST_CODES.has(e.code)) {
         setChosen(null);
@@ -644,22 +715,6 @@ export function BookingFlow({
     if (!lock) return;
     await dropLock();
     setStep(3);
-  }
-
-  /** Taslağı hemen yazıp giriş sayfasına gider; dönüşte 5. adıma dönülür. */
-  function goToLogin() {
-    writeDraft({
-      serviceIds: selectedIds,
-      staffId,
-      date,
-      step: 5,
-      chosen,
-      lock,
-      notes,
-      designLink,
-      hadDesignFile: designFile !== null || lostDesignFile,
-    });
-    router.push(loginHref);
   }
 
   function pickDesignFile(file: File | null) {
@@ -680,11 +735,8 @@ export function BookingFlow({
 
   async function confirm() {
     if (!lock || !chosen) return;
-    // Misafir: sunucuya boşuna gitmeden, seçimleri saklayıp girişe yönlendir.
-    if (!isMember) {
-      goToLogin();
-      return;
-    }
+    // Doğrulanmamışsa 5. adımda satır içi doğrulama kartı gösterilir.
+    if (!member) return;
     setBusy(true);
     setError(null);
     try {
@@ -698,6 +750,8 @@ export function BookingFlow({
         };
         allergyWarnings: { label: string; severity: string; note: string | null }[];
         savedMin: number;
+        forCustomer?: { id: number; firstName: string };
+        bookedForOther?: boolean;
       }>('/api/appointments', 'POST', {
         lockId: lock.lockId,
         date,
@@ -707,6 +761,7 @@ export function BookingFlow({
         shadowParentId: chosen.slot.shadowParentAppointmentId ?? null,
         notes: notes || undefined,
         designLink: designLink || undefined,
+        beneficiary,
       });
 
       // Dosya yüklemesi randevu oluştuktan SONRA yapılır (id gerekiyor).
@@ -733,14 +788,25 @@ export function BookingFlow({
         allergyWarnings: result.allergyWarnings,
         savedMin: result.savedMin,
         designUploadFailed,
+        forName: result.bookedForOther
+          ? (result.forCustomer?.firstName ?? recipientName.trim())
+          : null,
       });
       router.refresh();
     } catch (e) {
       if (e instanceof ApiError && e.code === 'MEMBERSHIP_REQUIRED') {
-        goToLogin();
+        // Oturum yok/düştü: yönlendirme yok, 5. adımda satır içi doğrulama açılır.
+        setMember(false);
+        setError(null);
         return;
       }
-      setError(e instanceof ApiError ? e.message : 'Randevu oluşturulamadı.');
+      setError(
+        e instanceof ApiError
+          ? e.code === 'RATE_LIMITED'
+            ? RATE_LIMIT_TEXT
+            : e.message
+          : 'Randevu oluşturulamadı.',
+      );
       if (e instanceof ApiError && SLOT_LOST_CODES.has(e.code)) {
         // CUSTOMER_OVERLAP'ta kilit hâlâ geçerli: bırak ki saat boşa tutulmasın.
         if (e.code === 'CUSTOMER_OVERLAP') await dropLock();
@@ -774,6 +840,9 @@ export function BookingFlow({
           <p className="muted">
             {confirmed.startLabel} – {confirmed.endLabel} · {confirmed.staffName}
           </p>
+          {confirmed.forName && (
+            <p className="mt-2 font-medium">Kimin için: {confirmed.forName}</p>
+          )}
           <p className="mt-2">{confirmed.serviceNames}</p>
           <p className="mt-2 text-lg font-semibold tabular-nums">{formatTl(confirmed.totalPrice)}</p>
           {confirmed.discountRate > 0 && (
@@ -798,6 +867,13 @@ export function BookingFlow({
           )}
         </div>
 
+        {confirmed.forName && (
+          <p className="alert alert-success text-left">
+            <CircleCheck size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+            <span>{confirmed.forName} kişisine WhatsApp ile bilgi gönderildi.</span>
+          </p>
+        )}
+
         {confirmed.allergyWarnings.length > 0 && (
           <div className="alert alert-danger text-left">
             <TriangleAlert size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
@@ -819,8 +895,8 @@ export function BookingFlow({
         )}
 
         <div className="flex gap-2">
-          <Link href="/hesabim" className="btn-primary flex-1">
-            Randevularım
+          <Link href="/randevularim" className="btn-primary flex-1">
+            Randevularımı gör
           </Link>
           <Link href="/" className="btn-secondary flex-1">
             Ana sayfa
@@ -862,7 +938,7 @@ export function BookingFlow({
       <Stepper step={step} onJump={(s) => void goToStep(s)} />
 
       {error && (
-        <p className="alert alert-danger">
+        <p className={`alert ${error === RATE_LIMIT_TEXT ? 'alert-warning' : 'alert-danger'}`}>
           <CircleAlert size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
           <span>{error}</span>
         </p>
@@ -884,6 +960,96 @@ export function BookingFlow({
             Birden fazla seçebilirsin — sistem hepsini <strong>tek kesintisiz blok</strong> hâline
             getirir ve mümkünse birbirinin bekleme süresine yerleştirerek toplam süreyi kısaltır.
           </p>
+
+          <div>
+            <p className="label">Kimin için?</p>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Kimin için?">
+              <button
+                type="button"
+                aria-pressed={mode === 'self'}
+                onClick={() => setMode('self')}
+                className={`chip ${mode === 'self' ? 'chip-active' : ''}`}
+              >
+                Kendim
+              </button>
+              <button
+                type="button"
+                aria-pressed={mode === 'other'}
+                onClick={() => setMode('other')}
+                className={`chip ${mode === 'other' ? 'chip-active' : ''}`}
+              >
+                Başkası adına
+              </button>
+              <button
+                type="button"
+                aria-pressed={false}
+                onClick={() =>
+                  router.push(
+                    selectedIds.length
+                      ? `/randevu/grup?services=${selectedIds.join(',')}`
+                      : '/randevu/grup',
+                  )
+                }
+                className="chip"
+              >
+                Grup (2–4 kişi)
+              </button>
+            </div>
+          </div>
+
+          {mode === 'other' && (
+            <div className="card space-y-4">
+              {!member && (
+                <PhoneVerify
+                  compact
+                  title="Önce kendi numaranı doğrula"
+                  description="Başkası adına randevu için önce senin numaranı doğrulamamız gerekiyor. Randevu oluşunca ilgili kişiye WhatsApp ile bilgi göndereceğiz."
+                  onVerified={handleVerified}
+                />
+              )}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label" htmlFor="rcp-name">
+                    Kimin için · Ad
+                  </label>
+                  <input
+                    id="rcp-name"
+                    className="field"
+                    value={recipientName}
+                    onChange={(e) => setRecipientName(e.target.value)}
+                    maxLength={40}
+                    placeholder="Ayşe"
+                    autoComplete="off"
+                  />
+                  {recipientName.trim() !== '' && !validName(recipientName) && (
+                    <p className="mt-1 text-xs text-danger-700">Ad yalnızca harf içermeli.</p>
+                  )}
+                </div>
+                <div>
+                  <label className="label" htmlFor="rcp-phone">
+                    Telefon
+                  </label>
+                  <input
+                    id="rcp-phone"
+                    className="field"
+                    value={recipientPhone}
+                    onChange={(e) => setRecipientPhone(e.target.value)}
+                    inputMode="tel"
+                    placeholder="0532 000 00 00"
+                    autoComplete="off"
+                  />
+                  {recipientPhone.trim() !== '' && recipientPhoneNorm === null && (
+                    <p className="mt-1 text-xs text-danger-700">
+                      Geçerli bir cep telefonu gir (5XX XXX XX XX).
+                    </p>
+                  )}
+                </div>
+              </div>
+              <p className="muted">
+                Randevu bu kişiye ait olur ve ona WhatsApp ile bilgi gönderilir.
+              </p>
+            </div>
+          )}
 
           <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
             {categories.map((c) => (
@@ -956,6 +1122,16 @@ export function BookingFlow({
       )}
 
       {/* ---------- 2) Usta seçimi ---------- */}
+      {/* Hizmet bağlantısıyla gelen 1. adımı atlar; "Kimin için?" seçimini kaçırmasın. */}
+      {step === 2 && initialServiceIds.length > 0 && mode === 'self' && (
+        <p className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-500">
+          <UserRound size={16} strokeWidth={1.5} aria-hidden />
+          <span>Kendin için alıyorsun.</span>
+          <button type="button" className="btn-link" onClick={() => setStep(1)}>
+            Başkası adına veya grup için değiştir
+          </button>
+        </p>
+      )}
       {step === 2 && (
         <StaffPicker
           serviceIds={selectedIds}
@@ -1106,8 +1282,6 @@ export function BookingFlow({
 
           <CountdownBar secondsLeft={secondsLeft} onCancel={() => void releaseLock()} />
 
-          {!isMember && <MembershipHint loginHref={loginHref} />}
-
           <div className="card space-y-3">
             <div>
               <label className="label" htmlFor="designFile">
@@ -1167,7 +1341,10 @@ export function BookingFlow({
           <h1 className="display text-3xl md:text-4xl">Son kontrol</h1>
           <CountdownBar secondsLeft={secondsLeft} onCancel={() => void releaseLock()} />
 
+          {member && memberName && mode === 'self' && <NameEditor firstName={memberName} />}
+
           <div className="card space-y-2">
+            {mode === 'other' && <Row label="Kimin için" value={recipientName.trim()} />}
             <Row label="Tarih" value={new Date(`${date}T00:00:00`).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })} />
             <Row label="Saat" value={`${lock.startLabel} – ${lock.endLabel}`} />
             <Row label="Usta" value={chosen.staff.staffName} />
@@ -1223,7 +1400,20 @@ export function BookingFlow({
             </div>
           )}
 
-          {!isMember && <MembershipHint loginHref={loginHref} />}
+          {mode === 'other' && (
+            <p className="muted">{recipientName.trim()} kişisine WhatsApp ile bilgi gönderilecek.</p>
+          )}
+
+          {!member && (
+            <div className="card">
+              <PhoneVerify
+                compact
+                title="Randevuyu onaylamak için numaranı doğrula"
+                description="Telefonuna WhatsApp ile bir kod göndereceğiz. Seçimlerin ve tuttuğun saat korunur."
+                onVerified={handleVerified}
+              />
+            </div>
+          )}
         </section>
       )}
 
@@ -1255,7 +1445,9 @@ export function BookingFlow({
               <button
                 type="button"
                 className="btn-primary flex-1"
-                disabled={selectedIds.length === 0}
+                disabled={
+                  selectedIds.length === 0 || (mode === 'other' && (!member || !recipientValid))
+                }
                 onClick={() => setStep(2)}
               >
                 Devam
@@ -1285,10 +1477,10 @@ export function BookingFlow({
               <button
                 type="button"
                 className="btn-primary flex-1"
-                disabled={busy}
+                disabled={busy || !member}
                 onClick={() => void confirm()}
               >
-                {busy ? 'Onaylanıyor…' : isMember ? 'Randevuyu onayla' : 'Giriş yap ve onayla'}
+                {busy ? 'Onaylanıyor…' : member ? 'Randevuyu onayla' : 'Önce numaranı doğrula'}
               </button>
             )}
           </div>
@@ -1537,25 +1729,6 @@ function CountdownBar({
       <button type="button" onClick={onCancel} className="btn-link">
         Vazgeç
       </button>
-    </div>
-  );
-}
-
-/**
- * Misafire ÖNCEDEN söylenir: onay için giriş gerekecek, ama seçimler ve
- * tutulan saat korunur — girişten sonra doğrudan onay adımına dönülür.
- */
-function MembershipHint({ loginHref }: { loginHref: string }) {
-  return (
-    <div className="alert alert-warning">
-      <TriangleAlert size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
-      <div>
-      Randevuyu tamamlamak için üye girişi gerekiyor (şifresiz, telefonuna gelen kodla).
-      Seçimlerin ve tuttuğun saat korunur; girişten sonra doğrudan onay adımına dönersin.{' '}
-      <Link href={loginHref} className="font-semibold underline">
-        Giriş yap
-      </Link>
-      </div>
     </div>
   );
 }
