@@ -124,6 +124,16 @@ def change_appointment_status(
             )
             freed_slot = True
 
+            # Bekleyen "yarin randevunuz var" hatirlatmasi iptal edilir.
+            db.execute(
+                update(ScheduledNotification)
+                .where(
+                    ScheduledNotification.dedupe_key == f"pre:{appointment.id}:24",
+                    ScheduledNotification.status == "PENDING",
+                )
+                .values(status="CANCELLED")
+            )
+
             hours_until = (starts_at - now).total_seconds() / 3600.0
             outcome = (
                 "NO_SHOW"

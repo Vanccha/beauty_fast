@@ -256,6 +256,9 @@ def verify_otp(
         db.flush()
     else:
         customer = existing
+        # Baskasi adina acilmis (dogrulanmamis) kayit: sahibi simdi dogruladi.
+        if not existing.is_member and existing.anonymized_at is None:
+            existing.is_member = True
         # Kayitli musterinin adi ilk giriste tamamlanmamissa guncelle.
         if (first_name or "").strip() and existing.first_name == "Yeni Üye":
             existing.first_name = first_name.strip()

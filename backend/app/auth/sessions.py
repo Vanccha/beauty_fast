@@ -41,7 +41,11 @@ CUSTOMER_COOKIE = "customer_session"
 VISITOR_COOKIE = "visitor_key"
 
 STAFF_TTL_DAYS = 7
-CUSTOMER_TTL_DAYS = 30
+CUSTOMER_TTL_DAYS = 180
+#: Kayan yenileme: oturumun kalan suresi bu gunun altina inince kullanimda
+#: sureyi yeniden CUSTOMER_TTL_DAYS'e uzatir (her istekte yazma olmasin
+#: diye en fazla ~30 gunde bir).
+CUSTOMER_RENEW_BELOW_DAYS = 150
 VISITOR_TTL_DAYS = 180
 
 
@@ -172,8 +176,17 @@ def get_customer_principal(db: Session, request: Request) -> CustomerPrincipal |
         return None
 
     session, customer = row
-    if session.expires_at <= now_local():
+    now = now_local()
+    if session.expires_at <= now:
         return None
+
+    # Kayan yenileme: cerezin yeni omru yanit olusturulurken
+    # (``EnvelopeRoute``) ``request.state`` uzerinden yazilir.
+    if session.expires_at - now < timedelta(days=CUSTOMER_RENEW_BELOW_DAYS):
+        new_expiry = _expiry(CUSTOMER_TTL_DAYS)
+        session.expires_at = new_expiry
+        db.commit()
+        request.state.customer_cookie_renew = (token, new_expiry)
 
     return CustomerPrincipal(
         id=customer.id,

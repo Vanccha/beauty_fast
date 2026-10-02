@@ -418,12 +418,24 @@ class Appointment(Base):
         Index("ix_appointment_branch_date", "branch_id", "date"),
         Index("ix_appointment_staff_date", "staff_id", "date"),
         Index("ix_appointment_customer", "customer_id"),
+        Index("ix_appointment_booked_by", "booked_by_customer_id"),
+        Index("ix_appointment_booking_group", "booking_group_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     branch_id: Mapped[int] = mapped_column(ForeignKey("branch.id", ondelete="CASCADE"))
     customer_id: Mapped[int] = mapped_column(ForeignKey("customer.id", ondelete="CASCADE"))
     staff_id: Mapped[int] = mapped_column(ForeignKey("staff.id", ondelete="CASCADE"))
+    #: BASKASI ADINA randevuda randevuyu alan (oturumdaki) musteri; kendi
+    #: adina alinanlarda da doldurulur (= customer_id). Eski kayitlarda NULL.
+    booked_by_customer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("customer.id", ondelete="SET NULL"), default=None
+    )
+    #: Grup randevusunda ayni grubun uyelerini baglayan kimlik (uuid hex).
+    booking_group_id: Mapped[str | None] = mapped_column(String(36), default=None)
+    #: Alanin yazdigi alici adi; alan kisiye alicinin kayitli adi ASLA
+    #: gosterilmez (isim sizdirma), bu etiket gosterilir.
+    beneficiary_label: Mapped[str | None] = mapped_column(String(80), default=None)
 
     #: "YYYY-MM-DD" - izgara hesaplari gun-yerel dakika uzerinden yapilir
     date: Mapped[str] = mapped_column(String(10))
@@ -455,7 +467,7 @@ class Appointment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
-    customer: Mapped[Customer] = relationship()
+    customer: Mapped[Customer] = relationship(foreign_keys=[customer_id])
     staff: Mapped[Staff] = relationship()
     branch: Mapped[Branch] = relationship()
     items: Mapped[list["AppointmentItem"]] = relationship(
@@ -557,6 +569,15 @@ class SlotLock(Base):
     #: Kilidi tutan tarayici oturumu / musteri
     session_id: Mapped[str] = mapped_column(String(64), index=True)
     customer_id: Mapped[int | None] = mapped_column(Integer, default=None)
+    #: Baskasi adina kilitte, kilit alinirken zaten kayitli olan alici musteri
+    #: (kayitli degilse NULL; onayda olusturulur).
+    beneficiary_customer_id: Mapped[int | None] = mapped_column(Integer, default=None)
+    #: Grup kilitlerini baglayan kimlik (ayni oturumun grup kilitleri
+    #: birbirini silmez).
+    group_id: Mapped[str | None] = mapped_column(String(36), default=None, index=True)
+    #: Grup kilidinde secilen hizmetler (virgullu, sirali); onayda sure/fiyat
+    #: bu listeden SUNUCUDA yeniden hesaplanir.
+    service_ids: Mapped[str | None] = mapped_column(String(255), default=None)
     #: Kilit randevuya donustuyse
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
     expires_at: Mapped[datetime] = mapped_column(DateTime)

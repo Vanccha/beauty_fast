@@ -66,8 +66,16 @@ def confirm_appointment_from_lock(
     shadow_parent_id: int | None = None,
     design_refs: Sequence[dict] | None = None,
     now: datetime | None = None,
+    booker_customer_id: int | None = None,
+    booking_group_id: str | None = None,
+    beneficiary_label: str | None = None,
+    commit: bool = True,
 ) -> Appointment:
+    """``customer_id`` randevunun SAHIBI (alici); baskasi adina randevuda
+    ``booker_customer_id`` oturumdaki alandir (kilidin sahipligi onunla
+    dogrulanir). Kendi adina alinirken ikisi aynidir."""
     now = now or now_local()
+    booker_customer_id = booker_customer_id or customer_id
     discount_rate = _clamp_rate(discount_rate)
     end_min = start_min + layout.total_min
 
@@ -81,7 +89,7 @@ def confirm_appointment_from_lock(
     )
 
     try:
-        lock = assert_lock_valid(db, lock_id, session_id, now, customer_id=customer_id)
+        lock = assert_lock_valid(db, lock_id, session_id, now, customer_id=booker_customer_id)
 
         # Kilit ile talep edilen randevu birebir ortusmeli - aksi halde
         # istemci, kilitlediginden farkli/uzun bir blogu kaydettirebilirdi.
@@ -102,6 +110,9 @@ def confirm_appointment_from_lock(
         appointment = Appointment(
             branch_id=branch_id,
             customer_id=customer_id,
+            booked_by_customer_id=booker_customer_id,
+            booking_group_id=booking_group_id,
+            beneficiary_label=beneficiary_label,
             staff_id=staff_id,
             date=date,
             start_min=start_min,
@@ -172,9 +183,12 @@ def confirm_appointment_from_lock(
         )
 
         lock.consumed_at = now
-        lock.customer_id = customer_id
+        lock.customer_id = booker_customer_id
 
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
         return appointment
 
     except IntegrityError as error:
@@ -182,7 +196,9 @@ def confirm_appointment_from_lock(
         if is_unique_violation(error):
             # Kilidin kendi hucreleri cakisma sayilmaz; kalan cakisma
             # yalnizca musterinin kendi takvimindeyse CUSTOMER_OVERLAP.
-            raise conflict_error(db, cells, date, [lock_id], now) from error
+            raise conflict_error(
+                db, cells, date, [lock_id], now, booker_customer_id != customer_id
+            ) from error
         raise
     except Exception:
         db.rollback()

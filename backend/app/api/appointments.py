@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
 from ..auth.sessions import read_visitor_key
@@ -32,6 +32,16 @@ from ..models import (
 )
 from ..services.appointment import confirm_appointment_from_lock
 from ..services.appointment_status import change_appointment_status
+from ..services.booking_for_other import (
+    BeneficiaryBody,
+    build_beneficiary_message,
+    ensure_other_booking_allowed,
+    find_or_create_beneficiary,
+    is_self,
+    label_for_viewer,
+    record_other_booking,
+    send_beneficiary_info,
+)
 from ..services.catalog import (
     assert_staff_can_do,
     get_default_branch,
@@ -55,6 +65,8 @@ class CreateAppointmentBody(BaseModel):
     shadowParentId: int | None = None
     notes: str | None = Field(default=None, max_length=500)
     designLink: str | None = None
+    #: Baskasi adina randevu: randevunun sahibi (ad + telefon).
+    beneficiary: BeneficiaryBody | None = None
 
     @field_validator("date")
     @classmethod
@@ -127,14 +139,33 @@ def create_appointment(
         ):
             shadow_parent_id = None
 
+    # --- Randevunun sahibi: kendisi mi, baskasi mi? ---------------------
+    # Alici telefonla bulunur/olusturulur (kayitli adi EZILMEZ). Randevu
+    # basarisiz olursa olusturulan musteri de geri alinir (commit yok).
+    for_other = not is_self(customer.phone, body.beneficiary)
+    owner_id = customer.id
+    owner_name = customer.first_name
+    owner_phone = customer.phone
+    if for_other:
+        ensure_other_booking_allowed(db, customer.id, body.beneficiary.phone)
+        owner = find_or_create_beneficiary(db, body.beneficiary)
+        owner_id, owner_name, owner_phone = owner.id, owner.first_name, owner.phone
+
     # --- Alerji ikazi ---------------------------------------------------
-    allergies = db.scalars(select(Allergy).where(Allergy.customer_id == customer.id)).all()
+    # Baskasi adina randevuda alicinin saglik verisi alana GOSTERILMEZ.
+    allergies = (
+        []
+        if for_other
+        else db.scalars(select(Allergy).where(Allergy.customer_id == customer.id)).all()
+    )
 
     appointment = confirm_appointment_from_lock(
         db,
         lock_id=body.lockId,
         session_id=session_id,
-        customer_id=customer.id,
+        customer_id=owner_id,
+        booker_customer_id=customer.id,
+        beneficiary_label=body.beneficiary.firstName if for_other else None,
         branch_id=branch.id,
         staff_id=body.staffId,
         date=body.date,
@@ -157,7 +188,7 @@ def create_appointment(
         appointment_id=appointment.id,
         starts_at=to_datetime(body.date, body.startMin),
         service_name=" + ".join(s.name for s in specs),
-        customer_name=customer.first_name,
+        customer_name=owner_name,
         hours_before=24,
     )
     if pre:
@@ -169,7 +200,7 @@ def create_appointment(
         if not exists:
             db.add(
                 ScheduledNotification(
-                    customer_id=customer.id,
+                    customer_id=owner_id,
                     channel=pre.channel,
                     body=pre.body,
                     due_at=pre.due_at,
@@ -178,7 +209,29 @@ def create_appointment(
             )
             db.commit()
 
+    # --- Baskasi adina: sayac + aliciya bilgilendirme (commit SONRASI) ---
+    if for_other:
+        record_other_booking(db, customer.id, owner_phone)
+        db.commit()
+        send_beneficiary_info(
+            db,
+            owner_phone,
+            build_beneficiary_message(
+                customer.first_name,
+                body.date,
+                body.startMin,
+                [s.name for s in specs],
+                body.beneficiary.firstName,
+            ),
+        )
+
     return {
+        "forCustomer": {
+            "id": owner_id,
+            # Alana alicinin KAYITLI adi degil, kendi yazdigi ad gosterilir.
+            "firstName": body.beneficiary.firstName if for_other else owner_name,
+        },
+        "bookedForOther": for_other,
         "appointment": {
             "id": appointment.id,
             "date": appointment.date,
@@ -206,10 +259,12 @@ def create_appointment(
 
 @router.get("/mine")
 def my_appointments(customer: CustomerDep, db: DbSession) -> dict:
-    """Musterinin kendi randevulari - yaklasan ve gecmis olarak ayrilmis.
+    """Musterinin randevulari: KENDI randevulari + BASKASI ADINA aldiklari
+    (``bookedByMe`` ve ``isMine=false``) - yaklasan ve gecmis olarak ayrilmis.
 
-    KVKK/gizlilik: yalnizca oturum sahibinin kayitlari doner ve gizli usta
-    notlari bu uca HIC dahil edilmez.
+    KVKK/gizlilik: alici (randevunun sahibi) kendi telefonuyla girince
+    yalnizca ``customer_id = kendisi`` olanlari gorur; alan kisinin
+    randevulari ona gorunmez. Gizli usta notlari bu uca HIC dahil edilmez.
     """
     today_key = to_date_key(now_local())
 
@@ -219,8 +274,14 @@ def my_appointments(customer: CustomerDep, db: DbSession) -> dict:
             selectinload(Appointment.items).selectinload(AppointmentItem.service),
             selectinload(Appointment.staff),
             selectinload(Appointment.design_refs),
+            selectinload(Appointment.customer),
         )
-        .where(Appointment.customer_id == customer.id)
+        .where(
+            or_(
+                Appointment.customer_id == customer.id,
+                Appointment.booked_by_customer_id == customer.id,
+            )
+        )
         .order_by(Appointment.date.desc(), Appointment.start_min.desc())
     ).all()
 
@@ -256,6 +317,13 @@ def my_appointments(customer: CustomerDep, db: DbSession) -> dict:
             "cancellable": a.date >= today_key and a.status in ("PENDING", "CONFIRMED"),
             #: Bu randevuya yorum yazilmis mi? (randevu basina tek yorum)
             "hasReview": a.id in reviewed,
+            #: Randevunun sahibi (baskasi adina alindiysa alici)
+            "forCustomer": {"id": a.customer_id, "firstName": label_for_viewer(a, customer.id)},
+            #: Bu randevuyu oturumdaki kisi mi aldi?
+            "bookedByMe": a.booked_by_customer_id == customer.id,
+            #: Randevu oturumdaki kisinin kendisine mi ait?
+            "isMine": a.customer_id == customer.id,
+            "groupId": a.booking_group_id,
         }
 
     is_upcoming = lambda a: a.date >= today_key and a.status in ("PENDING", "CONFIRMED")  # noqa: E731
@@ -284,6 +352,11 @@ def _load_owned(db: DbSession, appointment_id: int) -> Appointment:
     return appointment
 
 
+def _is_party(appointment: Appointment, customer_id: int) -> bool:
+    """Randevunun sahibi ya da randevuyu alan mi? (gorme + iptal yetkisi)"""
+    return customer_id in (appointment.customer_id, appointment.booked_by_customer_id)
+
+
 @router.get("/{appointment_id}")
 def appointment_detail(
     appointment_id: int, principal: AnyPrincipalDep, db: DbSession
@@ -294,10 +367,24 @@ def appointment_detail(
     """
     appointment = _load_owned(db, appointment_id)
 
-    if principal.kind == "customer" and appointment.customer_id != principal.customer.id:
+    # Sahibi VEYA randevuyu alan (salt okunur) gorebilir.
+    if principal.kind == "customer" and not _is_party(appointment, principal.customer.id):
         raise AppError("FORBIDDEN", "Bu randevuya erişiminiz yok.", 403)
 
     return {
+        "forCustomer": {
+            "id": appointment.customer.id,
+            "firstName": (
+                appointment.customer.first_name
+                if principal.kind == "staff"
+                else label_for_viewer(appointment, principal.customer.id)
+            ),
+        },
+        "bookedByMe": principal.kind == "customer"
+        and appointment.booked_by_customer_id == principal.customer.id,
+        "isMine": principal.kind == "customer"
+        and appointment.customer_id == principal.customer.id,
+        "groupId": appointment.booking_group_id,
         "id": appointment.id,
         "date": appointment.date,
         "dateLabel": format_date_tr(appointment.date),
@@ -379,7 +466,7 @@ def patch_appointment(
     appointment = _load_owned(db, appointment_id)
 
     if principal.kind == "customer":
-        if appointment.customer_id != principal.customer.id:
+        if not _is_party(appointment, principal.customer.id):
             raise AppError("FORBIDDEN", "Bu randevuya erişiminiz yok.", 403)
         if body.status not in CUSTOMER_ALLOWED:
             raise AppError(
@@ -392,6 +479,28 @@ def patch_appointment(
         status=body.status,
         expected_version=body.expectedVersion,
     )
+
+
+@router.post("/group/{group_id}/cancel")
+def cancel_group(group_id: str, customer: CustomerDep, db: DbSession) -> dict:
+    """Grubun tamamini iptal eder - YALNIZCA randevulari alan kisi.
+
+    Yalnizca bu kisinin aldigi, henuz son durumda olmayan (PENDING /
+    CONFIRMED) randevular iptal edilir. Hic eslesme yoksa 404.
+    """
+    rows = db.scalars(
+        select(Appointment).where(
+            Appointment.booking_group_id == group_id,
+            Appointment.booked_by_customer_id == customer.id,
+        )
+    ).all()
+    if not rows:
+        raise AppError("NOT_FOUND", "Grup randevusu bulunamadı.", 404)
+
+    ids = [a.id for a in rows if a.status in ("PENDING", "CONFIRMED")]
+    for appointment_id in ids:
+        change_appointment_status(db, appointment_id=appointment_id, status="CANCELLED")
+    return {"groupId": group_id, "cancelled": len(ids)}
 
 
 @router.post("/{appointment_id}/design")

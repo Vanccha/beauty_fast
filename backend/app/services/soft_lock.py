@@ -117,6 +117,7 @@ def conflict_error(
     date: str,
     exclude_lock_ids: Sequence[int] = (),
     now: datetime | None = None,
+    for_other: bool = False,
 ) -> AppError:
     """Unique ihlalini kullaniciya dogru anlatan hatayi uretir.
 
@@ -127,6 +128,12 @@ def conflict_error(
     """
     conflicts = _conflicting_cells(db, cells, date, exclude_lock_ids, now)
     if conflicts and all(c.owner_type == "CUSTOMER" for c in conflicts):
+        if for_other:
+            return AppError(
+                "CUSTOMER_OVERLAP",
+                "Bu kişinin bu saatte zaten başka bir randevusu var. Lütfen farklı bir saat seç.",
+                409,
+            )
         return AppError(
             "CUSTOMER_OVERLAP",
             "Bu saatte zaten başka bir randevun var. Lütfen farklı bir saat seç.",
@@ -148,8 +155,22 @@ def acquire_slot_lock(
     exclusive_resource_ids: Sequence[int] = (),
     ttl_seconds: int | None = None,
     now: datetime | None = None,
+    for_other: bool = False,
+    beneficiary_customer_id: int | None = None,
+    group_id: str | None = None,
+    service_ids: Sequence[int] | None = None,
+    commit: bool = True,
 ) -> AcquiredLock:
-    """Slot kilidi alir. Basarisizlikta ``SlotConflictError`` firlatir."""
+    """Slot kilidi alir. Basarisizlikta ``SlotConflictError`` firlatir.
+
+    ``for_other``: baskasi adina kilit. ``customer_id`` kilidi tutan (alan)
+    musteridir; musteri doluluk hucresi ALICI icin yazilir
+    (``beneficiary_customer_id``; alici henuz kayitli degilse hucre
+    yazilmaz, cakisma onayda yakalanir). ``group_id`` verilirse ayni
+    gruba ait kilitler birbirini silmez. ``commit=False``: cagiran
+    transaction'i kendisi bitirir (grup kilidi: hepsi ya da hicbiri);
+    hata durumunda yine de TUM transaction geri alinir.
+    """
     now = now or now_local()
     ttl_seconds = ttl_seconds or config.slot_lock_ttl_seconds
     expires_at = now + timedelta(seconds=ttl_seconds)
@@ -161,7 +182,7 @@ def acquire_slot_lock(
         date=date,
         start_min=start_min,
         staff_id=staff_id,
-        customer_id=customer_id,
+        customer_id=beneficiary_customer_id if for_other else customer_id,
         exclusive_resource_ids=exclusive_resource_ids,
     )
 
@@ -178,7 +199,10 @@ def acquire_slot_lock(
         stale_ids = list(
             db.scalars(
                 select(SlotLock.id).where(
-                    SlotLock.session_id == session_id, SlotLock.consumed_at.is_(None)
+                    SlotLock.session_id == session_id,
+                    SlotLock.consumed_at.is_(None),
+                    *([or_(SlotLock.group_id.is_(None), SlotLock.group_id != group_id)]
+                      if group_id else []),
                 )
             )
         )
@@ -191,6 +215,9 @@ def acquire_slot_lock(
             branch_id=branch_id,
             staff_id=staff_id,
             customer_id=customer_id,
+            beneficiary_customer_id=beneficiary_customer_id if for_other else None,
+            group_id=group_id,
+            service_ids=",".join(str(i) for i in service_ids) if service_ids else None,
             session_id=session_id,
             date=date,
             start_min=start_min,
@@ -216,12 +243,15 @@ def acquire_slot_lock(
                 for c in cells
             ]
         )
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
 
     except IntegrityError as error:
         db.rollback()
         if is_unique_violation(error):
-            raise conflict_error(db, cells, date, stale_ids, now) from error
+            raise conflict_error(db, cells, date, stale_ids, now, for_other) from error
         raise
     except Exception:
         db.rollback()

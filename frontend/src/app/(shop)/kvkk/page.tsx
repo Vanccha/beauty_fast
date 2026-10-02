@@ -82,7 +82,7 @@ export default async function KvkkPage() {
               <td>İşlem öncesi/sonrası fotoğraflar, renk ve ürün bilgisi</td>
               <td>
                 Uygulanan renk ve işlemin kaydı; bir sonraki seansta aynı sonucun elde edilmesi.
-                Bu fotoğraflar yalnızca salon personeli ve Hesabım sayfanızda size görünür;
+                Bu fotoğraflar yalnızca salon personeli ve Randevu Sorgula sayfanızda size görünür;
                 tanıtımda kullanılmaz.
               </td>
               <td>m.5/2-c sözleşmenin ifası, m.5/2-f meşru menfaat</td>
@@ -149,7 +149,7 @@ export default async function KvkkPage() {
       <h2 id="yontem">3. Toplama yöntemi</h2>
       <p>
         Kişisel verileriniz; web sitemiz ve mobil uygulamamızdaki giriş ve randevu formları,
-        Hesabım sayfası, WhatsApp üzerinden yürütülen yazışmalar ve salonda personelimiz
+        Randevu Sorgula sayfası, WhatsApp üzerinden yürütülen yazışmalar ve salonda personelimiz
         tarafından müşteri kartınıza yapılan kayıtlar aracılığıyla, kısmen otomatik (site ve
         uygulama) ve kısmen otomatik olmayan yollarla (salonda sözlü beyanınız) toplanır.
       </p>
@@ -251,7 +251,7 @@ export default async function KvkkPage() {
       <h2 id="basvuru">7. Başvuru yöntemi</h2>
       <p>
         <strong>Hızlı yol:</strong> Üyeyseniz{' '}
-        <Link href="/hesabim#gizlilik">Hesabım → Gizlilik ve verilerim</Link> bölümünden
+        <Link href="/randevularim#gizlilik">Randevu Sorgula → Kişisel verilerim ve verilerim</Link> bölümünden
         verilerinizi indirebilir, ileti onayınızı ve alerji bilgisi rızanızı geri alabilir veya
         hesabınızı silebilirsiniz.
       </p>

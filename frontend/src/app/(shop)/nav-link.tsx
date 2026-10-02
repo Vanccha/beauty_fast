@@ -20,7 +20,7 @@ export function NavLink({
   variant?: 'top' | 'bottom';
 }) {
   const pathname = usePathname();
-  const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
+  const active = href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
 
   if (variant === 'bottom') {
     return (

@@ -56,6 +56,13 @@ class EnvelopeRoute(APIRoute):
         async def envelope_handler(request: Request) -> Response:
             response = await original(request)
 
+            # Musteri oturumu kayan yenilemeyle uzatildiysa cerezi de tazele.
+            renew = getattr(request.state, "customer_cookie_renew", None)
+            if renew:
+                from .auth.sessions import CUSTOMER_COOKIE, _set_cookie
+
+                _set_cookie(response, CUSTOMER_COOKIE, renew[0], renew[1])
+
             content_type = response.headers.get("content-type", "")
             body = getattr(response, "body", None)
             if not content_type.startswith("application/json") or body is None:

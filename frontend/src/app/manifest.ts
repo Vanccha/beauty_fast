@@ -40,8 +40,8 @@ export default function manifest(): MetadataRoute.Manifest {
       },
       {
         name: 'Randevularım',
-        short_name: 'Hesabım',
-        url: '/hesabim?source=pwa',
+        short_name: 'Randevularım',
+        url: '/randevularim?source=pwa',
         icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }],
       },
       {

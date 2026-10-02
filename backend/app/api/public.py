@@ -13,7 +13,7 @@ from __future__ import annotations
 
 
 from fastapi import APIRouter, Depends, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -35,6 +35,7 @@ from ..models import (
     Staff,
     StaffService,
 )
+from ..services.booking_for_other import clean_person_name
 from ..services.catalog import get_default_branch
 from ..services.reviews import (
     get_review_summary,
@@ -63,6 +64,43 @@ def me(request: Request, db: DbSession) -> dict:
         "staff": staff.to_dict() if staff else None,
         "customer": customer.to_dict() if customer else None,
         "welcome": welcome,
+    }
+
+
+class UpdateMeBody(BaseModel):
+    firstName: str = Field(min_length=1, max_length=60)
+    lastName: str | None = Field(default=None, max_length=60)
+
+    @field_validator("firstName")
+    @classmethod
+    def _first(cls, v: str) -> str:
+        return clean_person_name(v, required=True)  # type: ignore[return-value]
+
+    @field_validator("lastName")
+    @classmethod
+    def _last(cls, v: str | None) -> str | None:
+        return clean_person_name(v, required=False)
+
+
+@router.patch("/api/me")
+def update_me(body: UpdateMeBody, customer: CustomerDep, db: DbSession) -> dict:
+    """Musteri adini gunceller ("Ismimi degistir"). Telefon degismez
+    (kimlik telefondur). ``lastName`` bos birakilirsa soyad temizlenir."""
+    row = db.get(Customer, customer.id)
+    row.first_name = body.firstName
+    row.last_name = body.lastName
+    db.commit()
+    db.refresh(row)
+    return {
+        "customer": {
+            "id": row.id,
+            "firstName": row.first_name,
+            "lastName": row.last_name,
+            "phone": row.phone,
+            "tier": row.tier,
+            "loyaltyPoints": row.loyalty_points,
+            "engagementOptIn": row.engagement_opt_in,
+        }
     }
 
 

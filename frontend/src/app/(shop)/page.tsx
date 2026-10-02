@@ -728,7 +728,7 @@ export default async function HomePage() {
               },
               {
                 q: 'Randevumu iptal edebilir veya değiştirebilir miyim?',
-                a: 'Hesabım sayfasından yaklaşan randevunu görebilir ve iptal edebilirsin. Saat değişikliği için salonu araman yeterli — yerini birine kaptırmadan yeni saati ayarlarız.',
+                a: 'Randevu Sorgula sayfasından yaklaşan randevunu görebilir ve iptal edebilirsin. Saat değişikliği için salonu araman yeterli — yerini birine kaptırmadan yeni saati ayarlarız.',
               },
               {
                 q: 'Boya beklerken salonda ne kadar oturuyorum?',

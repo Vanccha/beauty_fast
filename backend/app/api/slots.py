@@ -22,6 +22,12 @@ from ..errors import AppError
 from ..http import EnvelopeRoute
 from ..models import SlotViewEvent
 from ..services.availability import compute_availability
+from ..services.booking_for_other import (
+    BeneficiaryBody,
+    ensure_other_booking_allowed,
+    find_beneficiary_id,
+    is_self,
+)
 from ..services.catalog import (
     assert_staff_can_do,
     get_default_branch,
@@ -84,6 +90,8 @@ class LockBody(BaseModel):
     staffId: int = Field(gt=0)
     startMin: int = Field(ge=0, le=1439)
     shadowParentAppointmentId: int | None = None
+    #: Baskasi adina randevu: alici (ad + telefon). Oturum gerektirir.
+    beneficiary: BeneficiaryBody | None = None
 
     @field_validator("date")
     @classmethod
@@ -141,6 +149,19 @@ def lock_slot(body: LockBody, request: Request, response: Response, db: DbSessio
     customer = get_customer_principal(db, request)
     session_id = get_or_create_visitor_key(request, response)
 
+    # Baskasi adina: oturum sart; alici kayitliysa musteri hucresi ONUN
+    # icin yazilir (cakisma kontrolu alicinin takvimine gore).
+    for_other = False
+    beneficiary_id = None
+    if body.beneficiary is not None and customer is None:
+        raise AppError(
+            "MEMBERSHIP_REQUIRED", "Başkası adına randevu için telefonunu doğrulamalısın.", 401
+        )
+    if customer is not None and not is_self(customer.phone, body.beneficiary):
+        for_other = True
+        ensure_other_booking_allowed(db, customer.id, body.beneficiary.phone)
+        beneficiary_id = find_beneficiary_id(db, customer.phone, body.beneficiary)
+
     lock = acquire_slot_lock(
         db,
         branch_id=branch.id,
@@ -151,6 +172,8 @@ def lock_slot(body: LockBody, request: Request, response: Response, db: DbSessio
         layout=layout,
         customer_id=customer.id if customer else None,
         exclusive_resource_ids=get_exclusive_resource_ids(db, branch.id),
+        for_other=for_other,
+        beneficiary_customer_id=beneficiary_id,
     )
 
     return {
