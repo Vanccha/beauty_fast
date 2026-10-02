@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: 'Çerez Politikası' };
  * güncellenmelidir.
  *
  * Kaynaklar: backend `app/auth/sessions.py` (çerezler), arayüz
- * `components/pwa/InstallBanner.tsx` (localStorage), `public/sw.js`.
+ * `public/sw.js`.
  */
 export default function CookiePolicyPage() {
   return (
@@ -72,14 +72,6 @@ export default function CookiePolicyPage() {
                 kişisel olarak tanımlamaz.
               </td>
               <td>{RETENTION.visitorKeyDays} gün</td>
-            </tr>
-            <tr>
-              <td>
-                <code>aurora:install-dismissed-at</code>
-              </td>
-              <td>Tarayıcı depolaması (localStorage)</td>
-              <td>&quot;Ana ekrana ekle&quot; önerisini kapattığınızı hatırlar</td>
-              <td>30 gün sonra öneri yeniden gösterilebilir</td>
             </tr>
             <tr>
               <td>Uygulama önbelleği</td>
