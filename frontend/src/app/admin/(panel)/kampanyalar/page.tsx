@@ -76,34 +76,31 @@ export default async function CampaignsPage() {
   const { campaigns, customerCount } = await adminApi<CampaignsResponse>('/api/admin/campaigns');
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="section-title">Kampanyalar</h1>
-        <p className="muted">
-          Kupon kodu yok — kampanyalar müşteri profiline göre otomatik eşleşir.
-        </p>
-      </div>
+    <div className="space-y-3">
+      <p className="muted">
+        Kupon kodu yok — kampanyalar müşteri profiline göre otomatik eşleşir.
+      </p>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {campaigns.map((c) => {
           const rule = c.targetRule;
           const matched = c.matchedCount;
 
           return (
-            <article key={c.id} className="card">
+            <article key={c.id} className="card !p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <h2 className="font-semibold">
+                  <h2 className="text-sm font-semibold text-ink-900">
                     {c.name}
                     {!c.isActive && (
-                      <span className="badge ml-2 bg-sand-100 text-ink-500">pasif</span>
+                      <span className="badge ml-2 border border-sand-200 bg-sand-100 text-ink-500">pasif</span>
                     )}
                   </h2>
                   {c.description && <p className="muted">{c.description}</p>}
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="badge bg-plum-50 text-plum-700">
+                  <span className="badge border border-plum-300 bg-transparent text-plum-700">
                     {c.kind === 'DISCOUNT_PERCENT'
                       ? `%${c.value} indirim`
                       : c.kind === 'BONUS_POINTS'
@@ -115,8 +112,8 @@ export default async function CampaignsPage() {
               </div>
 
               <dl className="mt-3 grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
-                <div className="rounded-xl bg-sand-100 p-3">
-                  <dt className="muted">Hedefleme kuralı</dt>
+                <div className="rounded-[2px] border border-sand-200 p-3">
+                  <dt className="eyebrow">Hedefleme kuralı</dt>
                   <dd className="mt-1">
                     <ul className="space-y-0.5">
                       {describeRule(rule).map((r) => (
@@ -125,16 +122,16 @@ export default async function CampaignsPage() {
                     </ul>
                   </dd>
                 </div>
-                <div className="rounded-xl bg-sand-100 p-3">
-                  <dt className="muted">Şu anda eşleşen</dt>
-                  <dd className="mt-1 text-2xl font-semibold tabular-nums">
+                <div className="rounded-[2px] border border-sand-200 p-3">
+                  <dt className="eyebrow">Şu anda eşleşen</dt>
+                  <dd className="mt-1 display text-2xl tabular-nums">
                     {matched}{' '}
                     <span className="text-sm font-normal">/ {customerCount} müşteri</span>
                   </dd>
                 </div>
-                <div className="rounded-xl bg-sand-100 p-3">
-                  <dt className="muted">Verilmiş hak</dt>
-                  <dd className="mt-1 text-2xl font-semibold tabular-nums">{c.grantCount}</dd>
+                <div className="rounded-[2px] border border-sand-200 p-3">
+                  <dt className="eyebrow">Verilmiş hak</dt>
+                  <dd className="mt-1 display text-2xl tabular-nums">{c.grantCount}</dd>
                   <dd className="muted">öncelik: {c.priority}</dd>
                 </div>
               </dl>

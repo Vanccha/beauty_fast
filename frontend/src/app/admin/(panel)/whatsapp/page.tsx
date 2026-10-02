@@ -22,9 +22,8 @@ export default async function WhatsappPage() {
 
   if (role === 'STAFF') {
     return (
-      <div className="card">
-        <h1 className="section-title">WhatsApp bağlantısı</h1>
-        <p className="muted mt-1">Bu sayfayı yalnızca yönetici ve salon sahibi görebilir.</p>
+      <div className="card !p-4">
+        <p className="muted">Bu bölümü yalnızca yönetici ve salon sahibi görebilir.</p>
       </div>
     );
   }
@@ -35,21 +34,18 @@ export default async function WhatsappPage() {
   ]);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="section-title">WhatsApp bağlantısı</h1>
-        <p className="muted">
-          Doğrulama kodları ve randevu hatırlatmaları bu numaradan gönderilir.
-        </p>
-      </div>
+    <div className="space-y-3">
+      <p className="muted">
+        Doğrulama kodları ve randevu hatırlatmaları bu numaradan gönderilir.
+      </p>
 
       <WhatsappConnect initialStatus={status} canManage={role === 'OWNER'} />
 
       {status.driver === 'evolution' && <WelcomeSettings initial={welcome} />}
 
-      <section className="card space-y-2 text-sm">
-        <h2 className="font-semibold">Dikkat edilmesi gerekenler</h2>
-        <ul className="list-disc space-y-1 pl-5 text-ink-700">
+      <section className="card space-y-2 !p-4 text-sm">
+        <h2 className="eyebrow">Dikkat edilmesi gerekenler</h2>
+        <ul className="list-disc space-y-1 pl-5 text-xs text-ink-700">
           <li>
             Salonun ana numarasını değil, <strong>ayrı bir numara</strong> kullanın. QR ile bağlantı
             resmi bir entegrasyon değildir; WhatsApp numarayı kısıtlayabilir.

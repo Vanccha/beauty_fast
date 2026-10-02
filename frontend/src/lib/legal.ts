@@ -30,7 +30,7 @@ export const LEGAL = {
  */
 export const RETENTION = {
   otpMinutes: 5,
-  customerSessionDays: 30,
+  customerSessionDays: 180,
   staffSessionDays: 7,
   visitorKeyDays: 180,
   slotViewDays: 30,

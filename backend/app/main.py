@@ -39,7 +39,7 @@ from .config import config, validate_config
 from .db import init_db
 from .errors import AppError
 from .http import app_error_handler, unexpected_error_handler, validation_error_handler
-from .services import messaging
+from .services import messaging, notification_worker
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("aurora")
@@ -72,7 +72,10 @@ async def lifespan(application: FastAPI):
     config.upload_dir.mkdir(parents=True, exist_ok=True)
     # Yuklenen gorseller dogrudan servis edilir (tamamen lokal, S3 yok).
     application.mount("/uploads", StaticFiles(directory=config.upload_dir), name="uploads")
+    # Bildirim kuyrugu (hatirlatmalar, randevu onaylari) uygulama icinde bosaltilir.
+    worker = notification_worker.start()
     yield
+    await notification_worker.stop(worker)
 
 
 app = FastAPI(

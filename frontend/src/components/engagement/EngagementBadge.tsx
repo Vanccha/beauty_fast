@@ -15,7 +15,7 @@
  * `false` iken bileşen `null` döner.
  */
 
-import { Eye, Hourglass } from 'lucide-react';
+import { Eye, Hourglass, Tag } from 'lucide-react';
 
 export function ViewCountBadge({
   count,
@@ -54,15 +54,31 @@ export function ScarcityBadge({
 export function OpportunityBadge({
   discountRate,
   label,
+  compact = false,
 }: {
   discountRate: number;
   label: string;
+  /** Dar saat düğmeleri için: yalnızca simge + oran; tam metin title/aria'da. */
+  compact?: boolean;
 }) {
   if (discountRate <= 0) return null;
 
+  const percent = `%${Math.round(discountRate * 100)}`;
+  if (compact) {
+    return (
+      <span className="badge bg-success-50 text-success-700" title={`${percent} ${label}`}>
+        <Tag size={12} strokeWidth={1.75} aria-hidden />
+        <span aria-hidden>{percent}</span>
+        <span className="sr-only">
+          {percent} {label}
+        </span>
+      </span>
+    );
+  }
+
   return (
     <span className="badge bg-success-50 text-success-700">
-      %{Math.round(discountRate * 100)} {label}
+      {percent} {label}
     </span>
   );
 }

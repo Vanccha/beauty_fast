@@ -124,11 +124,14 @@ def change_appointment_status(
             )
             freed_slot = True
 
-            # Bekleyen "yarin randevunuz var" hatirlatmasi iptal edilir.
+            # Bekleyen "yarin randevunuz var" hatirlatmasi ve henuz gitmemis
+            # "randevunuz olusturuldu" onayi iptal edilir.
             db.execute(
                 update(ScheduledNotification)
                 .where(
-                    ScheduledNotification.dedupe_key == f"pre:{appointment.id}:24",
+                    ScheduledNotification.dedupe_key.in_(
+                        (f"pre:{appointment.id}:24", f"confirm:{appointment.id}")
+                    ),
                     ScheduledNotification.status == "PENDING",
                 )
                 .values(status="CANCELLED")

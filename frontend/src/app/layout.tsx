@@ -44,7 +44,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="tr" className={`${fraunces.variable} ${manrope.variable}`}>
+    <html lang="tr" data-scroll-behavior="smooth" className={`${fraunces.variable} ${manrope.variable}`}>
       <body className="min-h-dvh antialiased">
         {children}
         <ServiceWorkerRegister />

@@ -52,11 +52,11 @@ export function WelcomeSettings({ initial }: { initial: WelcomeSettingsData }) {
   }
 
   return (
-    <section className="card space-y-3">
+    <section className="card space-y-3 !p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-semibold">Karşılama mesajı</h2>
-          <p className="muted">
+          <h2 className="eyebrow">Karşılama mesajı</h2>
+          <p className="muted mt-1 text-xs">
             Salona WhatsApp&apos;tan <strong>ilk kez</strong> yazan kişiye otomatik gönderilir. Daha
             önce yazıştığınız, kod veya hatırlatma alan müşterilere gitmez.
           </p>
@@ -73,7 +73,7 @@ export function WelcomeSettings({ initial }: { initial: WelcomeSettingsData }) {
       </div>
 
       {!data.inboundConfigured && (
-        <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <p className="rounded-[2px] border border-brass-300 px-3 py-2 text-sm text-brass-700">
           Sunucu gelen mesajları almıyor (<code>EVOLUTION_WEBHOOK_URL</code> tanımlı değil). Ayar
           kaydedilir ama karşılama mesajı gönderilmez.
         </p>
@@ -107,13 +107,13 @@ export function WelcomeSettings({ initial }: { initial: WelcomeSettingsData }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="btn-primary" disabled={busy || !dirty} onClick={save}>
+        <button type="button" className="btn-primary btn-sm" disabled={busy || !dirty} onClick={save}>
           Kaydet
         </button>
         {message !== data.defaultMessage && enabled && (
           <button
             type="button"
-            className="btn-ghost text-sm"
+            className="btn-ghost btn-sm"
             disabled={busy}
             onClick={() => setMessage(data.defaultMessage)}
           >
@@ -121,13 +121,13 @@ export function WelcomeSettings({ initial }: { initial: WelcomeSettingsData }) {
           </button>
         )}
         {saved && !dirty && <span className="text-sm text-emerald-700">Kaydedildi.</span>}
-        {error && <span className="text-sm text-rose-600">{error}</span>}
+        {error && <span className="text-sm text-danger-700">{error}</span>}
       </div>
 
       {data.enabled && (
         <div>
           <p className="label">Müşteriye giden mesaj (kayıtlı hali)</p>
-          <p className="whitespace-pre-wrap rounded-xl bg-emerald-50 px-3 py-2 text-sm text-ink-900">
+          <p className="whitespace-pre-wrap rounded-[2px] border border-sand-200 bg-sand-50 px-3 py-2 text-sm text-ink-900">
             {data.preview}
           </p>
         </div>

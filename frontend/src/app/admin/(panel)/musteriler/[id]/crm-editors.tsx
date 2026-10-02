@@ -1,5 +1,6 @@
 'use client';
 
+import { Plus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -56,14 +57,14 @@ export function AllergyEditor({
   if (!open) {
     return (
       <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" className="btn-secondary text-sm" onClick={() => setOpen(true)}>
-          + Alerji ekle
+        <button type="button" className="btn-secondary btn-sm" onClick={() => setOpen(true)}>
+          <Plus size={14} strokeWidth={1.5} aria-hidden /> Alerji ekle
         </button>
         {allergies.map((a) => (
           <button
             key={a.id}
             type="button"
-            className="btn-ghost text-sm text-rose-700"
+            className="btn-ghost btn-sm text-rose-700"
             disabled={busy}
             onClick={() =>
               void run(() =>
@@ -74,7 +75,7 @@ export function AllergyEditor({
               )
             }
           >
-            ✕ {a.label}
+            <X size={14} strokeWidth={1.5} aria-hidden /> {a.label}
           </button>
         ))}
       </div>
@@ -83,7 +84,7 @@ export function AllergyEditor({
 
   return (
     <form
-      className="mt-3 space-y-2 rounded-xl bg-white p-3"
+      className="mt-3 space-y-2 rounded-[2px] border border-sand-200 bg-white p-3"
       onSubmit={async (e) => {
         e.preventDefault();
         const okay = await run(() =>
@@ -125,7 +126,7 @@ export function AllergyEditor({
         placeholder="Uygulama notu (isteğe bağlı)"
       />
       {!healthConsent && (
-        <label className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+        <label className="flex items-start gap-2 rounded-[2px] border border-brass-300 bg-sand-100 p-3 text-sm text-ink-900">
           <input
             type="checkbox"
             className="mt-0.5 h-5 w-5 shrink-0 accent-plum-600"
@@ -141,12 +142,12 @@ export function AllergyEditor({
           </span>
         </label>
       )}
-      {error && <p className="text-sm text-rose-600">{error}</p>}
+      {error && <p className="text-sm text-danger-700">{error}</p>}
       <div className="flex gap-2">
-        <button type="button" className="btn-secondary flex-1" onClick={() => setOpen(false)}>
+        <button type="button" className="btn-secondary btn-sm flex-1" onClick={() => setOpen(false)}>
           Vazgeç
         </button>
-        <button className="btn-primary flex-1" disabled={busy || (!healthConsent && !consent)}>
+        <button className="btn-primary btn-sm flex-1" disabled={busy || (!healthConsent && !consent)}>
           Kaydet
         </button>
       </div>
@@ -190,11 +191,11 @@ export function NoteEditor({ customerId }: { customerId: number }) {
           />
           Yalnızca personel görsün
         </label>
-        <button className="btn-primary ml-auto" disabled={busy || !body.trim()}>
+        <button className="btn-primary btn-sm ml-auto" disabled={busy || !body.trim()}>
           Not ekle
         </button>
       </div>
-      {error && <p className="text-sm text-rose-600">{error}</p>}
+      {error && <p className="text-sm text-danger-700">{error}</p>}
     </form>
   );
 }
@@ -272,8 +273,8 @@ export function PhotoUploader({ customerId }: { customerId: number }) {
         onChange={(e) => setNote(e.target.value)}
         placeholder="Not"
       />
-      {error && <p className="text-sm text-rose-600 md:col-span-2">{error}</p>}
-      <button className="btn-primary md:col-span-2" disabled={busy || !file}>
+      {error && <p className="text-sm text-danger-700 md:col-span-2">{error}</p>}
+      <button className="btn-primary btn-sm md:col-span-2" disabled={busy || !file}>
         {busy ? 'Yükleniyor…' : 'Albüme ekle'}
       </button>
     </form>

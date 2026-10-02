@@ -27,6 +27,7 @@ from ..deps import CustomerDep, DbSession
 from ..errors import AppError
 from ..http import EnvelopeRoute
 from ..models import OccupancyStat, ScheduledNotification, SlotLock, Staff
+from ..services import notification_worker
 from ..services.appointment import confirm_appointment_from_lock
 from ..services.availability import compute_availability
 from ..services.booking_for_other import (
@@ -38,6 +39,12 @@ from ..services.booking_for_other import (
     is_self,
     record_other_booking,
     send_beneficiary_info,
+)
+from ..services.booking_confirmation import (
+    CONFIRM_GROUP_PREFIX,
+    ConfirmationLine,
+    build_confirmation_message,
+    queue_confirmation,
 )
 from ..services.catalog import (
     assert_staff_can_do,
@@ -356,6 +363,7 @@ def confirm_group(
 
     results: list[dict] = []
     messages: list[tuple[str, str]] = []
+    confirmation_lines: list[ConfirmationLine] = []
     total = 0.0
 
     try:
@@ -440,6 +448,15 @@ def confirm_group(
                 )
 
             staff = db.get(Staff, lock.staff_id)
+            confirmation_lines.append(
+                ConfirmationLine(
+                    date=lock.date,
+                    start_min=lock.start_min,
+                    service_names=[s.name for s in specs],
+                    staff_name=staff.name if staff else "",
+                    for_name=None if ben is None else ben.firstName,
+                )
+            )
             total += appointment.total_price
             results.append(
                 {
@@ -456,10 +473,18 @@ def confirm_group(
                     "totalPrice": appointment.total_price,
                 }
             )
+        # Alana TEK ozet onay mesaji - randevularla ayni transaction'da.
+        queue_confirmation(
+            db,
+            customer.id,
+            f"{CONFIRM_GROUP_PREFIX}{body.groupId}",
+            build_confirmation_message(customer.first_name, confirmation_lines),
+        )
         db.commit()
     except Exception:
         db.rollback()
         raise
+    notification_worker.kick()
 
     for phone, text in messages:
         send_beneficiary_info(db, phone, text)

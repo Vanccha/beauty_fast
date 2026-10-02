@@ -29,7 +29,9 @@ from ..models import (
     OccupancyStat,
     Review,
     ScheduledNotification,
+    Staff,
 )
+from ..services import notification_worker
 from ..services.appointment import confirm_appointment_from_lock
 from ..services.appointment_status import change_appointment_status
 from ..services.booking_for_other import (
@@ -41,6 +43,12 @@ from ..services.booking_for_other import (
     label_for_viewer,
     record_other_booking,
     send_beneficiary_info,
+)
+from ..services.booking_confirmation import (
+    CONFIRM_PREFIX,
+    ConfirmationLine,
+    build_confirmation_message,
+    queue_confirmation,
 )
 from ..services.catalog import (
     assert_staff_can_do,
@@ -208,6 +216,28 @@ def create_appointment(
                 )
             )
             db.commit()
+
+    # --- Randevuyu alana onay mesaji (kuyruk + isciyi uyandir) -----------
+    staff = db.get(Staff, body.staffId)
+    queue_confirmation(
+        db,
+        customer.id,
+        f"{CONFIRM_PREFIX}{appointment.id}",
+        build_confirmation_message(
+            customer.first_name,
+            [
+                ConfirmationLine(
+                    date=body.date,
+                    start_min=body.startMin,
+                    service_names=[s.name for s in specs],
+                    staff_name=staff.name if staff else "",
+                    for_name=body.beneficiary.firstName if for_other else None,
+                )
+            ],
+        ),
+    )
+    db.commit()
+    notification_worker.kick()
 
     # --- Baskasi adina: sayac + aliciya bilgilendirme (commit SONRASI) ---
     if for_other:

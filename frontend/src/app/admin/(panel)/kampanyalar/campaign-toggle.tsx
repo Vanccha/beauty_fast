@@ -15,7 +15,7 @@ export function CampaignToggle({ id, isActive }: { id: number; isActive: boolean
     <>
       <button
         type="button"
-        className={isActive ? 'btn-secondary' : 'btn-primary'}
+        className={isActive ? 'btn-secondary btn-sm' : 'btn-primary btn-sm'}
         disabled={busy}
         onClick={async () => {
           setBusy(true);
@@ -32,7 +32,7 @@ export function CampaignToggle({ id, isActive }: { id: number; isActive: boolean
       >
         {isActive ? 'Durdur' : 'Yayınla'}
       </button>
-      {error && <span className="text-xs text-rose-600">{error}</span>}
+      {error && <span className="text-xs text-danger-700">{error}</span>}
     </>
   );
 }

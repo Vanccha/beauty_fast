@@ -19,11 +19,11 @@ interface QrResponse {
 }
 
 const STATE_LABELS: Record<string, { label: string; tone: string }> = {
-  open: { label: 'Bağlı', tone: 'bg-emerald-100 text-emerald-800' },
-  connecting: { label: 'Bağlanmayı bekliyor', tone: 'bg-amber-100 text-amber-800' },
-  close: { label: 'Bağlı değil', tone: 'bg-rose-100 text-rose-700' },
-  missing: { label: 'Henüz kurulmadı', tone: 'bg-sand-100 text-ink-700' },
-  unreachable: { label: 'Geçide ulaşılamıyor', tone: 'bg-rose-100 text-rose-700' },
+  open: { label: 'Bağlı', tone: 'border border-emerald-300 bg-transparent text-emerald-700' },
+  connecting: { label: 'Bağlanmayı bekliyor', tone: 'border border-brass-300 bg-transparent text-brass-700' },
+  close: { label: 'Bağlı değil', tone: 'border border-rose-300 bg-transparent text-rose-700' },
+  missing: { label: 'Henüz kurulmadı', tone: 'border border-sand-200 bg-sand-100 text-ink-700' },
+  unreachable: { label: 'Geçide ulaşılamıyor', tone: 'border border-rose-300 bg-transparent text-rose-700' },
 };
 
 /** QR kodu ~40 sn geçerlidir; süresi dolmadan yenisi istenir. */
@@ -133,8 +133,8 @@ export function WhatsappConnect({
 
   if (status.driver !== 'evolution') {
     return (
-      <section className="card space-y-1">
-        <p className="font-semibold">WhatsApp gönderimi kapalı</p>
+      <section className="card space-y-1 !p-4">
+        <p className="eyebrow">WhatsApp gönderimi kapalı</p>
         <p className="muted">
           Sunucu şu an mesajları yalnızca log&apos;a yazıyor (geliştirme modu). WhatsApp&apos;ı açmak
           için sunucu ayarlarında <code>NOTIFICATION_DRIVER=evolution</code> ve Evolution API
@@ -146,15 +146,15 @@ export function WhatsappConnect({
 
   const badge = STATE_LABELS[status.state] ?? {
     label: status.state,
-    tone: 'bg-sand-100 text-ink-700',
+    tone: 'border border-sand-200 bg-sand-100 text-ink-700',
   };
   const connected = status.state === 'open';
 
   return (
-    <section className="card space-y-4">
+    <section className="card space-y-3 !p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="font-semibold">Durum:</span>
+          <span className="eyebrow">Durum</span>
           <span className={`badge ${badge.tone}`} aria-live="polite">
             {badge.label}
           </span>
@@ -163,12 +163,12 @@ export function WhatsappConnect({
         {canManage && (
           <div className="flex flex-wrap gap-2">
             {!connected && (
-              <button type="button" className="btn-primary" disabled={busy} onClick={requestQr}>
+              <button type="button" className="btn-primary btn-sm" disabled={busy} onClick={requestQr}>
                 {qr ? 'QR kodunu yenile' : 'QR kodu ile bağla'}
               </button>
             )}
             {connected && (
-              <button type="button" className="btn-secondary" disabled={busy} onClick={logout}>
+              <button type="button" className="btn-secondary btn-sm" disabled={busy} onClick={logout}>
                 Bağlantıyı kes
               </button>
             )}
@@ -177,7 +177,7 @@ export function WhatsappConnect({
       </div>
 
       {status.state === 'unreachable' && (
-        <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        <p className="rounded-[2px] border border-rose-300 px-3 py-2 text-sm text-rose-700">
           WhatsApp geçidine (Evolution API) ulaşılamıyor. Sunucuda Evolution API&apos;nin çalıştığından
           emin olun.
         </p>
@@ -195,14 +195,14 @@ export function WhatsappConnect({
             alt="WhatsApp bağlantı QR kodu"
             width={264}
             height={264}
-            className="mx-auto rounded-xl border border-sand-200 bg-white p-2"
+            className="mx-auto rounded-[4px] border border-sand-200 bg-white p-2"
           />
           <div className="space-y-2 text-sm">
-            <p className="font-semibold">Telefonda şu adımları izleyin:</p>
+            <p className="eyebrow">Telefonda şu adımları izleyin</p>
             <ol className="list-decimal space-y-1 pl-5 text-ink-700">
               <li>Bu salon için kullanılacak telefonda WhatsApp&apos;ı açın.</li>
               <li>
-                <strong>Ayarlar → Bağlı cihazlar → Cihaz bağla</strong> adımlarına gidin.
+                <strong>Ayarlar › Bağlı cihazlar › Cihaz bağla</strong> adımlarına gidin.
               </li>
               <li>Ekrandaki QR kodunu okutun.</li>
             </ol>
@@ -220,7 +220,7 @@ export function WhatsappConnect({
       )}
 
       {notice && <p className="text-sm text-emerald-700">{notice}</p>}
-      {error && <p className="text-sm text-rose-600">{error}</p>}
+      {error && <p className="text-sm text-danger-700">{error}</p>}
     </section>
   );
 }

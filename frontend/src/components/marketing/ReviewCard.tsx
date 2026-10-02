@@ -13,7 +13,13 @@ import { Stars } from './Stars';
  * "Doğrulanmış randevu" rozeti yalnızca `isVerified` ise çıkar; bu alan
  * yorumun tamamlanmış bir randevuya bağlı olduğunu gösterir.
  */
-export function ReviewCard({ review }: { review: PublicReview }) {
+export function ReviewCard({
+  review,
+  compact = false,
+}: {
+  review: PublicReview;
+  compact?: boolean;
+}) {
   const initials = review.authorName
     .split(' ')
     .map((part) => part[0])
@@ -22,14 +28,22 @@ export function ReviewCard({ review }: { review: PublicReview }) {
     .toLocaleUpperCase('tr');
 
   return (
-    <figure className="flex h-full flex-col rounded-[4px] border border-sand-200 bg-white p-6">
+    <figure
+      className={`flex h-full flex-col rounded-[4px] border border-sand-200 bg-white ${
+        compact ? 'p-4' : 'p-6'
+      }`}
+    >
       <Stars value={review.rating} size="sm" />
 
-      <blockquote className="display mt-4 flex-1 text-[17px] italic leading-relaxed text-ink-900">
+      <blockquote
+        className={`display flex-1 italic leading-relaxed text-ink-900 ${
+          compact ? 'mt-2.5 text-[15px]' : 'mt-4 text-[17px]'
+        }`}
+      >
         “{review.comment}”
       </blockquote>
 
-      <div className="mt-6 space-y-2 border-t border-sand-200 pt-4">
+      <div className={`space-y-2 border-t border-sand-200 ${compact ? 'mt-4 pt-3' : 'mt-6 pt-4'}`}>
         <div className="flex items-center gap-3">
           <span
             aria-hidden

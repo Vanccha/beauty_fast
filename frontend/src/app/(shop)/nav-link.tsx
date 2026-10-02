@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { isLinkActive, useActiveSection } from './use-active-section';
+
 /**
  * Aktif sayfayı işaretleyen bağlantı. `usePathname` istemci hook'u
  * olduğu için ayrı bir client bileşende tutulur — layout sunucu bileşeni
@@ -20,7 +22,8 @@ export function NavLink({
   variant?: 'top' | 'bottom';
 }) {
   const pathname = usePathname();
-  const active = href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
+  const section = useActiveSection();
+  const active = isLinkActive(href, pathname, section);
 
   if (variant === 'bottom') {
     return (
