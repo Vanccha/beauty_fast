@@ -145,10 +145,14 @@ export default async function HomePage() {
 
   return (
     <div>
+      {/* İlk ekran: kahraman + güven şeridi birlikte ekranı TAM doldurur;
+          sonraki bölüm ("Ne yaptırmak istersin?") ancak kaydırınca görünür.
+          Mobilde alttaki sabit menünün (~63 px + güvenli alan) payı düşülür. */}
+      <div className="flex min-h-[calc(100svh-63px-env(safe-area-inset-bottom))] flex-col lg:min-h-svh">
       {/* ================================================================
           1. KAHRAMAN — sayfa metinle değil, fotoğrafla açılır
           ============================================================ */}
-      <section className="relative flex min-h-[72svh] items-end overflow-hidden md:min-h-[70svh]">
+      <section className="relative flex flex-1 items-end overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={hero.url}
@@ -167,7 +171,7 @@ export default async function HomePage() {
           className="absolute inset-0 bg-gradient-to-b from-ink-900/55 via-ink-900/30 to-ink-900/90"
         />
 
-        <div className="bleed relative pb-8 pt-24 text-white md:pb-10 md:pt-28">
+        <div className="bleed relative pb-8 pt-24 text-white md:pb-10 md:pt-28 [@media(max-height:720px)]:pb-5 [@media(max-height:720px)]:pt-20">
           {welcome ? (
             <>
               <p className="eyebrow !text-brass-300">{branch.salon.name}</p>
@@ -175,7 +179,7 @@ export default async function HomePage() {
                 {welcome.headline}
               </h1>
               {welcome.subline && (
-                <p className="mt-3 max-w-xl text-base text-white/85 md:text-lg">
+                <p className="mt-3 max-w-xl text-base text-white/85 md:text-lg [@media(max-height:720px)]:hidden">
                   {welcome.subline}
                 </p>
               )}
@@ -212,18 +216,18 @@ export default async function HomePage() {
                 <br />
                 işini bilen ellerde.
               </h1>
-              <p className="mt-4 max-w-xl text-base leading-relaxed text-white/85 md:text-lg">
+              <p className="mt-4 max-w-xl text-base leading-relaxed text-white/85 md:text-lg [@media(max-height:720px)]:hidden">
                 {branch.salon.name} — saç, tırnak, kaş ve cilt bakımında {stats.staffCount} uzman.
                 Uygun saatleri üye olmadan gör; randevu için tek adımlık telefon doğrulaması
                 yeterli.
               </p>
 
-              <div className="mt-6 flex flex-wrap items-center gap-3">
+              <div className="mt-6 flex flex-wrap items-center gap-3 [@media(max-height:720px)]:mt-4">
                 <Link href="/randevu" className="btn-light group">
                   Uygun saatleri gör
                   <ArrowRight size={16} strokeWidth={1.5} aria-hidden className="transition-transform duration-300 group-hover:translate-x-[3px]" />
                 </Link>
-                <Link href="/#portfolyo" className="btn-outline-light">
+                <Link href="/#portfolyo" className="btn-outline-light [@media(max-height:720px)]:hidden">
                   İşlerimize bak
                 </Link>
               </div>
@@ -234,7 +238,7 @@ export default async function HomePage() {
             Kahramanın altındaki şerit: puan + bugünün saatleri + adres.
             Puan yalnızca gerçek yorum varsa gösterilir.
           */}
-          <dl className="mt-7 flex flex-wrap gap-x-10 gap-y-3 border-t border-white/20 pt-4 text-sm text-white/80">
+          <dl className="mt-7 flex flex-wrap gap-x-10 gap-y-3 border-t border-white/20 pt-4 text-sm text-white/80 [@media(max-height:720px)]:mt-4 [@media(max-height:720px)]:pt-3">
             {reviewSummary.average !== null && (
               <div>
                 <dt className="text-[11px] uppercase tracking-[0.14em] text-white/60">Müşteri puanı</dt>
@@ -253,7 +257,8 @@ export default async function HomePage() {
                   : 'Kapalı'}
               </dd>
             </div>
-            <div>
+            {/* Alçak ekranlarda gizli: adres "Ziyaret" bölümünde de var. */}
+            <div className="[@media(max-height:720px)]:hidden">
               <dt className="text-[11px] uppercase tracking-[0.14em] text-white/60">Adres</dt>
               <dd className="mt-1 font-medium text-white">{branch.address}</dd>
             </div>
@@ -304,6 +309,7 @@ export default async function HomePage() {
             ))}
         </dl>
       </section>
+      </div>
 
       {/* ================================================================
           3. KATEGORİLER
