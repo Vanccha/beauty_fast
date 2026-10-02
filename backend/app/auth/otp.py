@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import hmac
 import logging
-import re
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -37,7 +36,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from ..config import config
-from ..core.risk_score import normalize_phone
+from ..core.risk_score import is_valid_mobile, normalize_phone
 from ..errors import AppError
 from ..models import Customer, Salon, VerificationCode
 from ..services import messaging
@@ -104,10 +103,8 @@ def issue_otp(
     """
     now = now or now_local()
     phone = normalize_phone(raw_phone)
-    if not re.fullmatch(r"5\d{9}", phone):
-        raise AppError(
-            "VALIDATION", "Geçerli bir cep telefonu numarası girin (5XX XXX XX XX).", 400
-        )
+    if not is_valid_mobile(phone):
+        raise AppError("VALIDATION", "Geçerli bir cep telefonu numarası girin (Türkiye: 5XX XXX XX XX; yurtdışı: ülke koduyla, örn. +44 7911 123456).", 400)
 
     # Kanal hazir degilse (WhatsApp numarasi bagli degil) hemen reddedilir.
     # Evolution API bagli olmayan instance'a gonderilen mesajda hata donmek

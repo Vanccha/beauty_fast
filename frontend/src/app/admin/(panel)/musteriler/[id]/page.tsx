@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 
 import { adminApi } from '@/lib/admin-api';
 import { formatTl } from '@/lib/api-client';
+import { formatPhone } from '@/lib/phone';
 import { ApiError } from '@/lib/server-api';
 import { formatDateTr } from '@/lib/time';
 import { AllergyEditor, NoteEditor, PhotoUploader } from './crm-editors';
@@ -151,7 +152,7 @@ export default async function CustomerCardPage({
             <h1 className="display text-xl text-ink-900">
               {profile.firstName} {profile.lastName ?? ''}
             </h1>
-            <p className="muted tabular-nums">0{profile.phone}</p>
+            <p className="muted tabular-nums">{formatPhone(profile.phone)}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               <span className={`badge ${TONE_CLASS[profile.segment.tone] ?? TONE_CLASS.slate}`}>
                 {profile.segment.badge}

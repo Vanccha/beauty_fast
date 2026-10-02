@@ -96,9 +96,34 @@ class RiskAssessment:
 
 
 def normalize_phone(phone: str | None) -> str:
-    """Telefonu 10 haneye normalize eder: +90 555 111 22 33 -> 5551112233."""
-    digits = re.sub(r"\D", "", phone or "")
+    """Telefonu saklama bicimine getirir.
+
+    * Turkiye numaralari (``+90``, ``0090``, ``0`` onekli ya da oneksiz) her
+      zaman 10 haneye iner: ``+90 555 111 22 33`` -> ``5551112233``. Mevcut
+      kayitlar bu bicimdedir; degismedi.
+    * ``+`` ya da ``00`` ile baslayan YURTDISI numaralari ``+`` ve rakamlar
+      olarak tutulur: ``+44 7911 123456`` -> ``+447911123456``.
+    """
+    raw = (phone or "").strip()
+    digits = re.sub(r"\D", "", raw)
+    international = raw.startswith("+") or digits.startswith("00")
+    if international:
+        digits = digits[2:] if digits.startswith("00") else digits
+        if digits.startswith("90"):
+            local = digits[2:]  # "+90 0555..." gibi fazladan 0 da tolere edilir
+            return local[-10:] if len(local) > 10 else local
+        return f"+{digits}" if digits else ""
     return digits[-10:] if len(digits) > 10 else digits
+
+
+#: Turkiye cep numarasi (saklama bicimi) ya da E.164 yurtdisi numarasi.
+_TR_MOBILE = re.compile(r"5\d{9}")
+_INTERNATIONAL = re.compile(r"\+[1-9]\d{6,14}")
+
+
+def is_valid_mobile(phone: str) -> bool:
+    """``normalize_phone`` ciktisi gecerli bir cep numarasi mi?"""
+    return bool(_TR_MOBILE.fullmatch(phone) or _INTERNATIONAL.fullmatch(phone))
 
 
 def hash_phone(phone: str, secret: str | None = None) -> str:

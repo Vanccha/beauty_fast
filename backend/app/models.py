@@ -277,8 +277,8 @@ class Customer(Base):
     __tablename__ = "customer"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    #: Normalize edilmis 10 haneli numara (5XXXXXXXXX)
-    phone: Mapped[str] = mapped_column(String(10), unique=True)
+    #: Normalize edilmis numara: Turkiye 10 hane (5XXXXXXXXX), yurtdisi E.164 (+447911123456)
+    phone: Mapped[str] = mapped_column(String(16), unique=True)
     first_name: Mapped[str] = mapped_column(String(80))
     last_name: Mapped[str | None] = mapped_column(String(80), default=None)
     email: Mapped[str | None] = mapped_column(String(160), default=None)
@@ -327,7 +327,7 @@ class VerificationCode(Base):
     __table_args__ = (Index("ix_verification_phone_expires", "phone", "expires_at"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    phone: Mapped[str] = mapped_column(String(10))
+    phone: Mapped[str] = mapped_column(String(16))
     code: Mapped[str] = mapped_column(String(8))
     customer_id: Mapped[int | None] = mapped_column(
         ForeignKey("customer.id", ondelete="CASCADE"), default=None

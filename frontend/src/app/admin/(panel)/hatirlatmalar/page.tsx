@@ -1,4 +1,5 @@
 import { adminApi } from '@/lib/admin-api';
+import { formatPhone } from '@/lib/phone';
 import { SweepButton } from './sweep-button';
 
 export const dynamic = 'force-dynamic';
@@ -182,7 +183,7 @@ export default async function ReminderRulesPage() {
               <div className="min-w-0">
                 <p className="truncate">{n.body}</p>
                 <p className="muted">
-                  {n.customer.firstName} · 0{n.customer.phone} ·{' '}
+                  {n.customer.firstName} · {formatPhone(n.customer.phone)} ·{' '}
                   {n.dueAt.toLocaleDateString('tr-TR')} {n.dueAt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>

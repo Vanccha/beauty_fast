@@ -4,7 +4,9 @@ import { ArrowLeft, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import { PhoneInput } from '@/components/auth/PhoneInput';
 import { ApiError, apiSend } from '@/lib/api-client';
+import { formatPhone, isValidMobile, normalizePhone } from '@/lib/phone';
 
 export interface VerifiedCustomer {
   id: number;
@@ -194,7 +196,7 @@ export function PhoneVerify({
     return wrap(
       <form onSubmit={handleVerify} className={compact ? 'space-y-4' : 'card space-y-5'}>
         <p className="muted">
-          <strong>0{sent?.phone}</strong> numarasına WhatsApp üzerinden gönderilen 6 haneli kodu gir.
+          <strong>{formatPhone(sent?.phone)}</strong> numarasına WhatsApp üzerinden gönderilen 6 haneli kodu gir.
         </p>
 
         <div>
@@ -263,17 +265,8 @@ export function PhoneVerify({
         <label className="label" htmlFor="pv-phone">
           Cep telefonu
         </label>
-        <input
-          id="pv-phone"
-          className="field"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          inputMode="tel"
-          autoComplete="tel"
-          placeholder="0532 000 00 00"
-          autoFocus={!compact}
-          required
-        />
+        <PhoneInput id="pv-phone" onChange={setPhone} autoFocus={!compact} required />
+        <p className="mt-1 text-xs text-ink-500">Yurtdışı numara için ülke kodunu seç.</p>
       </div>
 
       <label className="flex items-start gap-3 text-sm text-ink-700">
@@ -297,7 +290,7 @@ export function PhoneVerify({
 
       {errorBox}
 
-      <button className="btn-primary w-full" disabled={busy || phone.replace(/\D/g, '').length < 10}>
+      <button className="btn-primary w-full" disabled={busy || !isValidMobile(normalizePhone(phone))}>
         Kod gönder
       </button>
 

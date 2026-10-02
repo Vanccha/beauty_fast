@@ -18,8 +18,10 @@ import {
   durationLabel,
   formatTl,
 } from '@/lib/api-client';
+import { isValidMobile, normalizePhone as normalizeAnyPhone } from '@/lib/phone';
 import { CategoryIcon } from '@/components/marketing/CategoryIcon';
 import { NameEditor } from '@/components/auth/NameEditor';
+import { PhoneInput } from '@/components/auth/PhoneInput';
 import { PhoneVerify, type VerifiedCustomer } from '@/components/auth/PhoneVerify';
 
 /* ------------------------------------------------------------------ */
@@ -162,12 +164,10 @@ function dayChipLabel(key: string): { weekday: string; day: string } {
 /** "Kimin için?" seçimi (Grup ayrı sayfadır, burada tutulmaz). */
 type BookingMode = 'self' | 'other';
 
-/** Girilen telefonu 10 haneli 5XXXXXXXXX biçimine çevirir (geçersizse null). */
+/** Girilen telefonu saklama biçimine çevirir (geçersizse null). Kurallar `lib/phone.ts`'te. */
 function normalizePhone(raw: string): string | null {
-  let d = raw.replace(/\D/g, '');
-  if (d.startsWith('90') && d.length === 12) d = d.slice(2);
-  else if (d.startsWith('0') && d.length === 11) d = d.slice(1);
-  return /^5\d{9}$/.test(d) ? d : null;
+  const phone = normalizeAnyPhone(raw);
+  return isValidMobile(phone) ? phone : null;
 }
 
 const NAME_RE = /^\p{L}[\p{L} '’-]{0,39}$/u;
@@ -308,6 +308,8 @@ export function BookingFlow({
   const [mode, setMode] = useState<BookingMode>('self');
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
+  // Taslaktan geri yüklenince numara alanı yeni değerle yeniden kurulur.
+  const [phoneInputKey, setPhoneInputKey] = useState(0);
 
   const [step, setStep] = useState<Step>(initialServiceIds.length ? 2 : 1);
   const [activeCategory, setActiveCategory] = useState<number | null>(
@@ -455,6 +457,7 @@ export function BookingFlow({
     setMode(draftMode);
     setRecipientName(draft.recipientName ?? '');
     setRecipientPhone(draft.recipientPhone ?? '');
+    setPhoneInputKey((k) => k + 1);
     setSelectedIds(draft.serviceIds);
     setStaffId(draft.staffId);
     setDate(restoredDate);
@@ -1029,18 +1032,16 @@ export function BookingFlow({
                   <label className="label" htmlFor="rcp-phone">
                     Telefon
                   </label>
-                  <input
+                  <PhoneInput
+                    key={phoneInputKey}
                     id="rcp-phone"
-                    className="field"
-                    value={recipientPhone}
-                    onChange={(e) => setRecipientPhone(e.target.value)}
-                    inputMode="tel"
-                    placeholder="0532 000 00 00"
+                    defaultValue={recipientPhone}
+                    onChange={setRecipientPhone}
                     autoComplete="off"
                   />
                   {recipientPhone.trim() !== '' && recipientPhoneNorm === null && (
                     <p className="mt-1 text-xs text-danger-700">
-                      Geçerli bir cep telefonu gir (5XX XXX XX XX).
+                      Geçerli bir cep telefonu gir (yurtdışı için ülke kodunu seç).
                     </p>
                   )}
                 </div>

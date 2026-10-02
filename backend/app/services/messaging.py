@@ -70,6 +70,9 @@ def to_whatsapp_number(phone: str) -> str:
     if "@" in phone:
         return phone
     digits = "".join(ch for ch in phone if ch.isdigit())
+    # Yurtdisi numarasi (``+447911123456``) zaten ulke kodunu tasir.
+    if phone.startswith("+"):
+        return digits
     code = config.whatsapp_country_code
     if digits.startswith(code) and len(digits) > 10:
         return digits

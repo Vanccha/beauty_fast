@@ -9,6 +9,7 @@ import { resolveHeroImage } from '@/lib/hero-image';
 import { serverApi, type MeResponse, type PublicReview, type ReviewSummary } from '@/lib/server-api';
 import { photo, photoOrFallback } from '@/lib/site-photos';
 import { minutesToLabel } from '@/lib/time';
+import { ScrollCue } from './scroll-cue';
 import { CategoryIcon } from '@/components/marketing/CategoryIcon';
 
 export const dynamic = 'force-dynamic';
@@ -269,7 +270,9 @@ export default async function HomePage() {
       {/* ================================================================
           2. GÜVEN ŞERİDİ — her rakam veritabanından sayılır
           ============================================================ */}
-      <section className="border-b border-sand-200 bg-white">
+      <section className="relative border-b border-sand-200 bg-white">
+        {/* Fotoğraf ile şeridin birleştiği çizginin ortasında; yalnızca en üstteyken */}
+        <ScrollCue targetId="hizmetler" />
         <dl className="bleed grid grid-cols-2 gap-4 py-6 md:grid-cols-4 md:gap-6 md:py-8">
           {[
             {
@@ -314,7 +317,7 @@ export default async function HomePage() {
       {/* ================================================================
           3. KATEGORİLER
           ============================================================ */}
-      <section className="bleed py-12 md:py-16">
+      <section id="hizmetler" className="bleed py-12 md:py-16">
         <p className="eyebrow reveal">Hizmetlerimiz</p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
           <h2 className="display reveal text-2xl md:text-4xl">Ne yaptırmak istersin?</h2>
