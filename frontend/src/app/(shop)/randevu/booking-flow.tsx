@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Check, CircleAlert, CircleCheck, TriangleAlert } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -17,6 +18,7 @@ import {
   durationLabel,
   formatTl,
 } from '@/lib/api-client';
+import { CategoryIcon } from '@/components/marketing/CategoryIcon';
 
 /* ------------------------------------------------------------------ */
 /* Tipler — API sözleşmesinin istemci tarafı karşılığı                 */
@@ -756,11 +758,11 @@ export function BookingFlow({
 
   if (confirmed) {
     return (
-      <div className="mx-auto max-w-md space-y-4 px-4 py-8 text-center">
-        <div className="text-5xl" aria-hidden>
-          ✅
+      <div className="mx-auto max-w-md space-y-5 px-5 py-12 text-center">
+        <div className="flex justify-center text-success-600" aria-hidden>
+          <CircleCheck size={44} strokeWidth={1.5} />
         </div>
-        <h1 className="text-2xl font-semibold">Randevun oluşturuldu</h1>
+        <h1 className="display text-3xl">Randevun oluşturuldu</h1>
         <div className="card text-left">
           <p className="font-medium">
             {new Date(`${date}T00:00:00`).toLocaleDateString('tr-TR', {
@@ -773,29 +775,35 @@ export function BookingFlow({
             {confirmed.startLabel} – {confirmed.endLabel} · {confirmed.staffName}
           </p>
           <p className="mt-2">{confirmed.serviceNames}</p>
-          <p className="mt-2 text-lg font-semibold">{formatTl(confirmed.totalPrice)}</p>
+          <p className="mt-2 text-lg font-semibold tabular-nums">{formatTl(confirmed.totalPrice)}</p>
           {confirmed.discountRate > 0 && (
             <p className="muted">
               Fırsat saati indirimi: %{Math.round(confirmed.discountRate * 100)}
             </p>
           )}
           {confirmed.savedMin > 0 && (
-            <p className="mt-2 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-              Paket sıkıştırması sayesinde {confirmed.savedMin} dakika erken çıkacaksın.
+            <p className="alert alert-success mt-2">
+              <CircleCheck size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+              <span>Paket sıkıştırması sayesinde {confirmed.savedMin} dakika erken çıkacaksın.</span>
             </p>
           )}
           {confirmed.designUploadFailed && (
-            <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              Randevun oluştu ama görselin yüklenemedi. Görseli randevuna gelirken
-              ustana gösterebilirsin.
+            <p className="alert alert-warning mt-2">
+              <TriangleAlert size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+              <span>
+                Randevun oluştu ama görselin yüklenemedi. Görseli randevuna gelirken
+                ustana gösterebilirsin.
+              </span>
             </p>
           )}
         </div>
 
         {confirmed.allergyWarnings.length > 0 && (
-          <div className="rounded-2xl border-2 border-rose-300 bg-rose-50 p-4 text-left">
-            <p className="font-semibold text-rose-800">⚠️ Kayıtlı alerji uyarın</p>
-            <ul className="mt-1 space-y-1 text-sm text-rose-700">
+          <div className="alert alert-danger text-left">
+            <TriangleAlert size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+            <div>
+            <p className="font-semibold">Kayıtlı alerji uyarın</p>
+            <ul className="mt-1 space-y-1 text-sm">
               {confirmed.allergyWarnings.map((a) => (
                 <li key={a.label}>
                   <strong>{a.label}</strong>
@@ -803,9 +811,10 @@ export function BookingFlow({
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-xs text-rose-600">
+            <p className="mt-2 text-xs">
               Bu uyarı ustaya da iletildi.
             </p>
+            </div>
           </div>
         )}
 
@@ -853,14 +862,16 @@ export function BookingFlow({
       <Stepper step={step} onJump={(s) => void goToStep(s)} />
 
       {error && (
-        <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {error}
+        <p className="alert alert-danger">
+          <CircleAlert size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{error}</span>
         </p>
       )}
 
       {notice && !error && (
-        <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          {notice}
+        <p className="alert alert-success">
+          <CircleCheck size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+          <span>{notice}</span>
         </p>
       )}
 
@@ -868,7 +879,7 @@ export function BookingFlow({
       {/* ---------- 1) Hizmet seçimi ---------- */}
       {step === 1 && (
         <section className="space-y-3">
-          <h1 className="section-title">Hangi hizmetleri istiyorsun?</h1>
+          <h1 className="display text-3xl md:text-4xl">Hangi hizmetleri istiyorsun?</h1>
           <p className="muted">
             Birden fazla seçebilirsin — sistem hepsini <strong>tek kesintisiz blok</strong> hâline
             getirir ve mümkünse birbirinin bekleme süresine yerleştirerek toplam süreyi kısaltır.
@@ -880,11 +891,9 @@ export function BookingFlow({
                 key={c.id}
                 type="button"
                 onClick={() => setActiveCategory(c.id)}
-                className={`btn shrink-0 ${
-                  activeCategory === c.id ? 'bg-plum-600 text-white' : 'border border-sand-300 bg-white'
-                }`}
+                className={`chip shrink-0 ${activeCategory === c.id ? 'chip-active' : ''}`}
               >
-                <span aria-hidden>{c.icon}</span> {c.name}
+                <CategoryIcon slug={c.slug} /> {c.name}
               </button>
             ))}
           </div>
@@ -905,10 +914,10 @@ export function BookingFlow({
                       type="button"
                       onClick={() => toggleService(service.id)}
                       aria-pressed={selected}
-                      className={`w-full rounded-2xl border p-4 text-left transition ${
+                      className={`w-full rounded-[4px] border p-4 text-left transition-colors ${
                         selected
-                          ? 'border-plum-500 bg-plum-50 ring-2 ring-plum-100'
-                          : 'border-sand-200 bg-white'
+                          ? 'border-plum-600 bg-plum-50'
+                          : 'border-sand-200 bg-white hover:border-ink-300'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -930,13 +939,13 @@ export function BookingFlow({
                               </span>
                             )}
                             {service.shadowGuestAllowed && (
-                              <span className="badge bg-emerald-50 text-emerald-700">
+                              <span className="badge bg-success-50 text-success-700">
                                 Ara saate sığar
                               </span>
                             )}
                           </div>
                         </div>
-                        <span className="shrink-0 font-semibold">{formatTl(service.price)}</span>
+                        <span className="shrink-0 font-semibold tabular-nums">{formatTl(service.price)}</span>
                       </div>
                     </button>
                   </li>
@@ -963,7 +972,7 @@ export function BookingFlow({
       {/* ---------- 3) Tarih + slot ---------- */}
       {step === 3 && (
         <section className="space-y-3">
-          <h1 className="section-title">Ne zaman gelmek istersin?</h1>
+          <h1 className="display text-3xl md:text-4xl">Ne zaman gelmek istersin?</h1>
 
           <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
             {days.map((d) => {
@@ -979,12 +988,12 @@ export function BookingFlow({
                     setChosen(null);
                     setError(null);
                   }}
-                  className={`flex w-14 shrink-0 touch-target flex-col items-center rounded-2xl border py-2 ${
-                    active ? 'border-plum-500 bg-plum-600 text-white' : 'border-sand-200 bg-white'
+                  className={`chip w-14 shrink-0 touch-target flex-col gap-0 py-2 ${
+                    active ? 'chip-active chip-primary' : ''
                   }`}
                 >
                   <span className="text-xs opacity-80">{chip.weekday}</span>
-                  <span className="text-lg font-semibold">{chip.day}</span>
+                  <span className="text-lg font-semibold tabular-nums">{chip.day}</span>
                 </button>
               );
             })}
@@ -995,8 +1004,9 @@ export function BookingFlow({
           {loadingSlots && <p className="muted">Uygun saatler hesaplanıyor…</p>}
 
           {!loadingSlots && availability?.message && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              {availability.message}
+            <div className="alert alert-warning">
+              <TriangleAlert size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+              <span>{availability.message}</span>
             </div>
           )}
 
@@ -1005,7 +1015,7 @@ export function BookingFlow({
               <div key={staff.staffId} className="card">
                 <div className="flex items-center justify-between">
                   <p className="font-medium">{staff.staffName}</p>
-                  <span className="muted">
+                  <span className="muted tabular-nums">
                     {durationLabel(staff.totalMin)} · {formatTl(staff.totalPrice)}
                   </span>
                 </div>
@@ -1025,12 +1035,12 @@ export function BookingFlow({
                           onClick={() => void selectSlot(staff, slot)}
                           aria-pressed={active}
                           title={slot.heldByYou ? 'Bu saat şu anda senin için tutuluyor' : undefined}
-                          className={`flex touch-target flex-col items-center justify-center rounded-xl border px-1 py-2 text-sm ${
+                          className={`chip chip-primary touch-target h-auto flex-col gap-0 px-1 py-2 ${
                             active
-                              ? 'border-plum-500 bg-plum-600 text-white'
+                              ? 'chip-active'
                               : slot.heldByYou
-                                ? 'border-plum-400 bg-plum-50 hover:border-plum-500'
-                                : 'border-sand-200 bg-white hover:border-plum-300'
+                                ? 'border-plum-400 bg-plum-50 hover:border-plum-600'
+                                : ''
                           }`}
                         >
                           <span className="font-semibold tabular-nums">{slot.label}</span>
@@ -1063,7 +1073,7 @@ export function BookingFlow({
             ))}
 
           {availability && availability.shadowUpsell.length > 0 && (
-            <div className="card bg-plum-50">
+            <div className="card border-plum-200 bg-plum-50">
               <p className="font-medium text-plum-700">Beklerken bunları da yaptırabilirsin</p>
               <p className="muted">
                 Paketinde ustanın serbest kaldığı bir pencere var; bu hizmetler oraya sığıyor.
@@ -1088,7 +1098,7 @@ export function BookingFlow({
       {/* ---------- 4) Tasarım görseli ---------- */}
       {step === 4 && lock && (
         <section className="space-y-3">
-          <h1 className="section-title">İstediğin bir model var mı?</h1>
+          <h1 className="display text-3xl md:text-4xl">İstediğin bir model var mı?</h1>
           <p className="muted">
             İsteğe bağlı. Bir görsel yükleyebilir veya Pinterest/Instagram bağlantısı
             yapıştırabilirsin — ustan randevudan önce görür.
@@ -1113,7 +1123,7 @@ export function BookingFlow({
               <p className="mt-1 muted">JPG, PNG veya WEBP · en fazla 8 MB</p>
               {designFile && <p className="mt-1 text-sm text-ink-700">Seçili: {designFile.name}</p>}
               {lostDesignFile && !designFile && (
-                <p className="mt-1 text-sm text-amber-800">
+                <p className="mt-1 text-sm text-warning-600">
                   Giriş sırasında seçtiğin görsel korunamadı (tarayıcı dosyaları saklayamaz).
                   İstersen yeniden ekleyebilirsin.
                 </p>
@@ -1154,7 +1164,7 @@ export function BookingFlow({
       {/* ---------- 5) Özet ---------- */}
       {step === 5 && lock && chosen && (
         <section className="space-y-3">
-          <h1 className="section-title">Son kontrol</h1>
+          <h1 className="display text-3xl md:text-4xl">Son kontrol</h1>
           <CountdownBar secondsLeft={secondsLeft} onCancel={() => void releaseLock()} />
 
           <div className="card space-y-2">
@@ -1183,12 +1193,13 @@ export function BookingFlow({
               />
             )}
             {lock.savedMin > 0 && (
-              <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                Sıkıştırma sayesinde {lock.savedMin} dakika kazandın.
+              <p className="alert alert-success">
+                <CircleCheck size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+                <span>Sıkıştırma sayesinde {lock.savedMin} dakika kazandın.</span>
               </p>
             )}
             {chosen.slot.isShadowFill && (
-              <p className="rounded-xl bg-plum-50 px-3 py-2 text-sm text-plum-700">
+              <p className="rounded-[2px] bg-plum-50 px-3 py-2 text-sm text-plum-700">
                 Bu saat, ustanın başka bir işlemde beklediği süreye denk geliyor. Salon için
                 verimli, senin için erken bir saat.
               </p>
@@ -1196,16 +1207,19 @@ export function BookingFlow({
           </div>
 
           {lostDesignFile && !designFile && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              Giriş sırasında seçtiğin görsel korunamadı.{' '}
-              <button
-                type="button"
-                className="font-semibold underline"
-                onClick={() => void goToStep(4)}
-              >
-                Görseli yeniden ekle
-              </button>{' '}
-              (tuttuğun saat korunur).
+            <div className="alert alert-warning">
+              <TriangleAlert size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+              <div>
+                Giriş sırasında seçtiğin görsel korunamadı.{' '}
+                <button
+                  type="button"
+                  className="font-semibold underline"
+                  onClick={() => void goToStep(4)}
+                >
+                  Görseli yeniden ekle
+                </button>{' '}
+                (tuttuğun saat korunur).
+              </div>
             </div>
           )}
 
@@ -1215,14 +1229,14 @@ export function BookingFlow({
 
       {/* ---------- Alt eylem çubuğu ---------- */}
       <div className="sticky bottom-20 z-10 md:bottom-4">
-        <div className="rounded-2xl border border-sand-200 bg-white p-3 shadow-lg">
+        <div className="rounded-[4px] border border-sand-200 bg-white p-3">
           <div className="mb-2 flex items-center justify-between text-sm">
             <span className="muted">
               {selectedIds.length === 0
                 ? 'Hizmet seçilmedi'
                 : `${selectedIds.length} hizmet · ${barTotal.approx ? 'yaklaşık ' : ''}${durationLabel(barTotal.min)}`}
             </span>
-            <span className="font-semibold">{formatTl(barTotal.price)}</span>
+            <span className="font-semibold tabular-nums">{formatTl(barTotal.price)}</span>
           </div>
 
           <div className="flex gap-2">
@@ -1290,7 +1304,7 @@ export function BookingFlow({
 
 function Stepper({ step, onJump }: { step: Step; onJump: (s: Step) => void }) {
   return (
-    <ol className="flex items-center gap-1">
+    <ol className="flex items-start gap-3">
       {STEPS.map((s) => {
         const state = s.id === step ? 'current' : s.id < step ? 'done' : 'todo';
         return (
@@ -1302,15 +1316,27 @@ function Stepper({ step, onJump }: { step: Step; onJump: (s: Step) => void }) {
               className="w-full text-left"
             >
               <div
-                className={`h-1.5 rounded-full ${
-                  state === 'todo' ? 'bg-sand-200' : 'bg-plum-500'
+                className={`${state === 'current' ? 'h-0.5' : 'h-px'} ${
+                  state === 'todo' ? 'bg-sand-300' : 'bg-plum-600'
                 }`}
               />
               <span
-                className={`mt-1 block text-[11px] ${
-                  state === 'current' ? 'font-semibold text-plum-700' : 'text-ink-500'
+                className={`mt-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase ${
+                  state === 'current'
+                    ? 'text-ink-900'
+                    : state === 'done'
+                      ? 'text-plum-600'
+                      : 'text-ink-400'
                 }`}
+                style={{ letterSpacing: '0.12em' }}
               >
+                {state === 'done' ? (
+                  <Check size={12} strokeWidth={2} aria-hidden />
+                ) : (
+                  <span className="tabular-nums" aria-hidden>
+                    {s.id}
+                  </span>
+                )}
                 {s.label}
               </span>
             </button>
@@ -1340,7 +1366,7 @@ function PackageSummaryCard({
           Toplam {summary.isNominal ? 'yaklaşık ' : ''}
           {durationLabel(summary.totalMin)}
         </p>
-        <p className="font-semibold">{formatTl(summary.totalPrice)}</p>
+        <p className="font-semibold tabular-nums">{formatTl(summary.totalPrice)}</p>
       </div>
 
       {summary.isNominal && (
@@ -1351,13 +1377,13 @@ function PackageSummaryCard({
       )}
 
       {summary.savedMin > 0 && (
-        <p className="mt-1 text-sm text-emerald-700">
+        <p className="mt-1 text-sm text-success-700">
           Sıkıştırma ile {summary.savedMin} dakika kazanç — hizmetler birbirinin bekleme
           süresine yerleşti.
         </p>
       )}
 
-      <div className="mt-3 flex h-8 w-full overflow-hidden rounded-lg border border-sand-200">
+      <div className="mt-3 flex h-8 w-full overflow-hidden rounded-[2px] border border-sand-200">
         {summary.items.map((item) => {
           const seg = (min: number) => `${(min / summary.totalMin) * 100}%`;
           return (
@@ -1390,10 +1416,10 @@ function PackageSummaryCard({
 
       <div className="mt-2 flex gap-3 text-xs text-ink-500">
         <span className="flex items-center gap-1">
-          <span className="inline-block h-2.5 w-4 rounded bg-plum-500" /> usta meşgul
+          <span className="inline-block h-2.5 w-4 rounded-[2px] bg-plum-500" /> usta meşgul
         </span>
         <span className="flex items-center gap-1">
-          <span className="shadow-window inline-block h-2.5 w-4 rounded" /> bekleme (usta serbest)
+          <span className="shadow-window inline-block h-2.5 w-4 rounded-[2px]" /> bekleme (usta serbest)
         </span>
       </div>
     </div>
@@ -1437,7 +1463,7 @@ function StaffPicker({
 
   return (
     <section className="space-y-3">
-      <h1 className="section-title">Kiminle çalışmak istersin?</h1>
+      <h1 className="display text-3xl md:text-4xl">Kiminle çalışmak istersin?</h1>
       <p className="muted">
         Yalnızca seçtiğin hizmetlerin <strong>tamamını</strong> yapabilen ustalar listelenir.
       </p>
@@ -1448,7 +1474,7 @@ function StaffPicker({
         <button
           type="button"
           onClick={() => onChange(null)}
-          className={`card text-left ${value === null ? 'border-plum-500 ring-2 ring-plum-100' : ''}`}
+          className={`card text-left ${value === null ? 'border-plum-600 bg-plum-50' : 'hover:border-ink-300'}`}
         >
           <p className="font-medium">Farketmez</p>
           <p className="muted">En uygun saatleri bulmak için tüm ustalar taranır.</p>
@@ -1460,7 +1486,7 @@ function StaffPicker({
             type="button"
             onClick={() => onChange(s.id)}
             className={`card flex items-center gap-3 text-left ${
-              value === s.id ? 'border-plum-500 ring-2 ring-plum-100' : ''
+              value === s.id ? 'border-plum-600 bg-plum-50' : 'hover:border-ink-300'
             }`}
           >
             {s.photoUrl ? (
@@ -1496,8 +1522,10 @@ function CountdownBar({
 
   return (
     <div
-      className={`flex items-center justify-between rounded-2xl px-4 py-3 text-sm ${
-        urgent ? 'bg-rose-50 text-rose-800' : 'bg-plum-50 text-plum-700'
+      className={`flex items-center justify-between rounded-[2px] border px-4 py-3 text-sm ${
+        urgent
+          ? 'border-danger-600/30 bg-danger-50 text-danger-700'
+          : 'border-plum-200 bg-plum-50 text-plum-700'
       }`}
     >
       <span>
@@ -1506,7 +1534,7 @@ function CountdownBar({
           {minutes}:{String(seconds).padStart(2, '0')}
         </strong>
       </span>
-      <button type="button" onClick={onCancel} className="font-medium underline">
+      <button type="button" onClick={onCancel} className="btn-link">
         Vazgeç
       </button>
     </div>
@@ -1519,12 +1547,15 @@ function CountdownBar({
  */
 function MembershipHint({ loginHref }: { loginHref: string }) {
   return (
-    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm">
+    <div className="alert alert-warning">
+      <TriangleAlert size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+      <div>
       Randevuyu tamamlamak için üye girişi gerekiyor (şifresiz, telefonuna gelen kodla).
       Seçimlerin ve tuttuğun saat korunur; girişten sonra doğrudan onay adımına dönersin.{' '}
       <Link href={loginHref} className="font-semibold underline">
         Giriş yap
       </Link>
+      </div>
     </div>
   );
 }
@@ -1533,7 +1564,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-sand-100 pb-2 last:border-0">
       <span className="muted">{label}</span>
-      <span className="text-right font-medium">{value}</span>
+      <span className="text-right font-medium tabular-nums">{value}</span>
     </div>
   );
 }

@@ -1,8 +1,12 @@
 import type { Metadata, Viewport } from 'next';
+import { Fraunces, Manrope } from 'next/font/google';
 
 import { ServiceWorkerRegister } from '@/components/pwa/ServiceWorkerRegister';
 
 import './globals.css';
+
+const fraunces = Fraunces({ subsets: ['latin', 'latin-ext'], display: 'swap', variable: '--font-fraunces' });
+const manrope = Manrope({ subsets: ['latin', 'latin-ext'], display: 'swap', variable: '--font-manrope' });
 
 export const metadata: Metadata = {
   title: 'Aurora Beauty Studio — Randevu',
@@ -35,12 +39,12 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#77496a',
+  themeColor: '#6E2B3A',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="tr">
+    <html lang="tr" className={`${fraunces.variable} ${manrope.variable}`}>
       <body className="min-h-dvh antialiased">
         {children}
         <ServiceWorkerRegister />

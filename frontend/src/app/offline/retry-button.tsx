@@ -1,5 +1,6 @@
 'use client';
 
+import { RefreshCw } from 'lucide-react';
 import { useEffect } from 'react';
 
 /** Bağlantı geri geldiğinde sayfayı kendiliğinden yeniler. */
@@ -11,7 +12,8 @@ export function RetryButton() {
   }, []);
 
   return (
-    <button type="button" className="btn-primary mt-6 w-full" onClick={() => window.location.reload()}>
+    <button type="button" className="btn-primary mt-8 w-full" onClick={() => window.location.reload()}>
+      <RefreshCw size={16} strokeWidth={1.5} aria-hidden />
       Tekrar dene
     </button>
   );

@@ -1,5 +1,6 @@
 'use client';
 
+import { Download, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -79,12 +80,15 @@ export function PrivacyPanel({ initial }: { initial: PrivacyStatus }) {
     });
 
   return (
-    <section id="gizlilik" className="scroll-mt-24 space-y-2">
-      <h2 className="section-title">Gizlilik ve verilerim</h2>
+    <section id="gizlilik" className="scroll-mt-24 space-y-4">
+      <div>
+        <p className="eyebrow">Gizlilik</p>
+        <h2 className="section-title mt-1">Gizlilik ve verilerim</h2>
+      </div>
 
-      <div className="card divide-y divide-sand-100 p-0">
+      <div className="card divide-y divide-sand-200 p-0 md:p-0">
         {/* Ticari ileti onayı */}
-        <div className="flex items-start justify-between gap-4 p-4">
+        <div className="flex items-start justify-between gap-4 p-5">
           <div>
             <p className="text-sm font-medium">Hatırlatma ve kampanya iletileri</p>
             <p className="muted mt-0.5">
@@ -92,7 +96,7 @@ export function PrivacyPanel({ initial }: { initial: PrivacyStatus }) {
                 ? `WhatsApp ile bakım hatırlatması alıyorsun (onay: ${formatDate(status.marketingConsentAt)}).`
                 : 'Bakım zamanı hatırlatması ve kampanya iletisi almıyorsun.'}{' '}
               Randevu hatırlatmaları bundan bağımsızdır.{' '}
-              <Link href="/acik-riza#ticari-ileti" className="underline">
+              <Link href="/acik-riza#ticari-ileti" className="underline underline-offset-2">
                 Onay metni
               </Link>
             </p>
@@ -104,12 +108,12 @@ export function PrivacyPanel({ initial }: { initial: PrivacyStatus }) {
             aria-label="Hatırlatma ve kampanya iletileri"
             disabled={busy === 'marketing'}
             onClick={() => void toggleMarketing()}
-            className={`relative mt-1 h-7 w-12 shrink-0 rounded-full transition ${
+            className={`relative mt-1 h-7 w-12 shrink-0 rounded-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-plum-600 ${
               status.marketingConsent ? 'bg-plum-600' : 'bg-sand-300'
             }`}
           >
             <span
-              className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
+              className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${
                 status.marketingConsent ? 'left-6' : 'left-1'
               }`}
             />
@@ -117,7 +121,7 @@ export function PrivacyPanel({ initial }: { initial: PrivacyStatus }) {
         </div>
 
         {/* Sağlık verisi */}
-        <div className="p-4">
+        <div className="p-5">
           <p className="text-sm font-medium">Alerji bilgisi (sağlık verisi)</p>
           {status.healthConsent ? (
             <>
@@ -126,18 +130,18 @@ export function PrivacyPanel({ initial }: { initial: PrivacyStatus }) {
                 bilgin kayıtlı; usta işlem öncesi uyarı görür.
               </p>
               {confirm === 'health' ? (
-                <div className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+                <div className="alert alert-warning mt-3 block">
                   <p>
                     Kayıtlı alerji bilgilerin <strong>kalıcı olarak silinecek</strong>. Sonraki
                     ziyaretlerinde alerjini ustana sözlü olarak bildirmelisin.
                   </p>
                   <div className="mt-3 flex gap-2">
-                    <button type="button" className="btn-secondary flex-1" onClick={() => setConfirm(null)}>
+                    <button type="button" className="btn-secondary btn-sm flex-1" onClick={() => setConfirm(null)}>
                       Vazgeç
                     </button>
                     <button
                       type="button"
-                      className="btn flex-1 bg-amber-600 text-white hover:bg-amber-700"
+                      className="btn-secondary btn-sm flex-1 border-warning-600 text-warning-600 hover:bg-warning-600 hover:text-white"
                       disabled={busy === 'health'}
                       onClick={() => void withdrawHealth()}
                     >
@@ -148,7 +152,7 @@ export function PrivacyPanel({ initial }: { initial: PrivacyStatus }) {
               ) : (
                 <button
                   type="button"
-                  className="btn-ghost mt-2 px-0 text-sm text-amber-700"
+                  className="btn-link mt-3 text-warning-600 hover:text-warning-600"
                   onClick={() => setConfirm('health')}
                 >
                   Rızamı geri al ve bilgileri sil
@@ -163,38 +167,39 @@ export function PrivacyPanel({ initial }: { initial: PrivacyStatus }) {
         </div>
 
         {/* Verilerimi indir */}
-        <div className="flex items-center justify-between gap-4 p-4">
+        <div className="flex items-center justify-between gap-4 p-5">
           <div>
             <p className="text-sm font-medium">Verilerimi indir</p>
             <p className="muted mt-0.5">Hakkında tuttuğumuz bilgilerin bir kopyası (JSON).</p>
           </div>
           <button
             type="button"
-            className="btn-secondary shrink-0 text-sm"
+            className="btn-secondary btn-sm shrink-0"
             disabled={busy === 'export'}
             onClick={() => void download()}
           >
+            <Download size={16} strokeWidth={1.5} aria-hidden />
             {busy === 'export' ? 'Hazırlanıyor…' : 'İndir'}
           </button>
         </div>
 
         {/* Hesabımı sil */}
-        <div className="p-4">
+        <div className="p-5">
           <p className="text-sm font-medium">Hesabımı sil</p>
           {confirm === 'delete' ? (
-            <div className="mt-2 rounded-xl bg-rose-50 p-3 text-sm text-rose-900">
+            <div className="alert alert-danger mt-3 block">
               <p>
                 Adın, telefonun, alerji bilgilerin, fotoğrafların, yorumların ve sadakat puanların{' '}
                 <strong>kalıcı olarak silinir</strong>. Bu işlem geri alınamaz. Geçmiş randevuların
                 yalnızca kimliksiz istatistik olarak kalır.
               </p>
               <div className="mt-3 flex gap-2">
-                <button type="button" className="btn-secondary flex-1" onClick={() => setConfirm(null)}>
+                <button type="button" className="btn-secondary btn-sm flex-1" onClick={() => setConfirm(null)}>
                   Vazgeç
                 </button>
                 <button
                   type="button"
-                  className="btn flex-1 bg-rose-600 text-white hover:bg-rose-700"
+                  className="btn-danger btn-sm flex-1"
                   disabled={busy === 'delete'}
                   onClick={() => void deleteAccount()}
                 >
@@ -207,7 +212,7 @@ export function PrivacyPanel({ initial }: { initial: PrivacyStatus }) {
               <p className="muted mt-0.5">Yaklaşan randevun varsa önce iptal etmelisin.</p>
               <button
                 type="button"
-                className="btn-ghost mt-2 px-0 text-sm text-rose-600"
+                className="btn-link mt-3 text-danger-600 hover:text-danger-700"
                 onClick={() => setConfirm('delete')}
               >
                 Hesabımı sil
@@ -217,10 +222,15 @@ export function PrivacyPanel({ initial }: { initial: PrivacyStatus }) {
         </div>
       </div>
 
-      {error && <p className="text-sm text-rose-600">{error}</p>}
+      {error && (
+        <div className="alert alert-danger" role="alert">
+          <TriangleAlert size={16} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
       <p className="muted">
         Diğer talepler için{' '}
-        <Link href="/kvkk#basvuru" className="underline">
+        <Link href="/kvkk#basvuru" className="underline underline-offset-2">
           KVKK başvuru yöntemi
         </Link>
         .

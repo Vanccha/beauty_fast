@@ -16,7 +16,7 @@ export function NavLink({
 }: {
   href: string;
   children: React.ReactNode;
-  icon?: string;
+  icon?: React.ReactNode;
   variant?: 'top' | 'bottom';
 }) {
   const pathname = usePathname();
@@ -27,11 +27,12 @@ export function NavLink({
       <Link
         href={href}
         aria-current={active ? 'page' : undefined}
-        className={`flex flex-1 touch-target flex-col items-center justify-center gap-0.5 py-2 text-xs font-medium ${
-          active ? 'text-plum-700' : 'text-ink-500'
+        className={`relative flex flex-1 touch-target flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-semibold tracking-[0.06em] transition-colors ${
+          active ? 'text-ink-900' : 'text-ink-400'
         }`}
       >
-        <span aria-hidden className="text-lg leading-none">
+        {active && <span aria-hidden className="absolute inset-x-6 top-0 h-0.5 bg-brass-500" />}
+        <span aria-hidden className="grid h-5 place-items-center leading-none">
           {icon}
         </span>
         {children}
@@ -43,7 +44,7 @@ export function NavLink({
     <Link
       href={href}
       aria-current={active ? 'page' : undefined}
-      className={`btn-ghost ${active ? 'bg-sand-100 text-plum-700' : ''}`}
+      className={`btn-ghost ${active ? 'bg-plum-50 text-plum-600' : ''}`}
     >
       {children}
     </Link>

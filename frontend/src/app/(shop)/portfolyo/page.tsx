@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { serverApi } from '@/lib/server-api';
+import { CategoryIcon } from '@/components/marketing/CategoryIcon';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,13 +38,16 @@ export default async function PortfolioPage({
   const active = categories.find((c) => c.slug === kategori) ?? null;
 
   return (
-    <div className="page-shell space-y-4 pt-6">
-      <h1 className="section-title">Portfolyo</h1>
+    <div className="page-shell space-y-8 pb-16 pt-8 md:pt-12">
+      <header className="reveal">
+        <p className="eyebrow">Galeri</p>
+        <h1 className="display mt-2 text-3xl md:text-5xl">Portfolyo</h1>
+      </header>
 
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+      <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 md:mx-0 md:px-0">
         <Link
           href="/portfolyo"
-          className={`btn shrink-0 ${!active ? 'bg-plum-600 text-white' : 'border border-sand-300 bg-white'}`}
+          className={`chip shrink-0 ${!active ? 'chip-active' : ''}`}
         >
           Hepsi
         </Link>
@@ -51,11 +55,9 @@ export default async function PortfolioPage({
           <Link
             key={c.id}
             href={`/portfolyo?kategori=${c.slug}`}
-            className={`btn shrink-0 ${
-              active?.id === c.id ? 'bg-plum-600 text-white' : 'border border-sand-300 bg-white'
-            }`}
+            className={`chip shrink-0 ${active?.id === c.id ? 'chip-active' : ''}`}
           >
-            <span aria-hidden>{c.icon}</span> {c.name}
+            <CategoryIcon slug={c.slug} /> {c.name}
           </Link>
         ))}
       </div>
@@ -63,20 +65,22 @@ export default async function PortfolioPage({
       {items.length === 0 ? (
         <p className="muted">Bu kategoride henüz paylaşılmış iş yok.</p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-6">
           {items.map((item) => (
             <figure
               key={item.id}
-              className="overflow-hidden rounded-2xl border border-sand-200 bg-white"
+              className="group overflow-hidden rounded-[4px] border border-sand-200 bg-white"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={item.imageUrl}
-                alt={item.title}
-                loading="lazy"
-                className="aspect-square w-full object-cover"
-              />
-              <figcaption className="p-3">
+              <div className="overflow-hidden">
+                <img
+                  src={item.imageUrl}
+                  alt={item.title}
+                  loading="lazy"
+                  className="aspect-square w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                />
+              </div>
+              <figcaption className="p-4">
                 <p className="text-sm font-medium">{item.title}</p>
                 <p className="muted">
                   {item.category?.name}

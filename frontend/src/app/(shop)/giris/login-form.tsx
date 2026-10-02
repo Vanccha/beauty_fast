@@ -1,5 +1,6 @@
 'use client';
 
+import { ArrowLeft, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -112,7 +113,7 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
 
   if (needsName) {
     return (
-      <form onSubmit={handleName} className="card space-y-3">
+      <form onSubmit={handleName} className="card space-y-5">
         <div>
           <label className="label" htmlFor="firstName">
             Adın
@@ -136,7 +137,7 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
 
   if (step === 'code') {
     return (
-      <form onSubmit={handleVerify} className="card space-y-3">
+      <form onSubmit={handleVerify} className="card space-y-5">
         <p className="muted">
           <strong>0{sent?.phone}</strong> numarasına WhatsApp üzerinden gönderilen 6 haneli kodu gir.
         </p>
@@ -147,7 +148,7 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
           </label>
           <input
             id="code"
-            className="field text-center text-2xl tracking-[0.4em]"
+            className="field text-center text-2xl tabular-nums tracking-[0.4em]"
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
             inputMode="numeric"
@@ -159,13 +160,18 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
         </div>
 
         {sent?.devCode && (
-          <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <p className="alert alert-warning text-xs">
             Geliştirme modu: kod <strong>{sent.devCode}</strong> (sunucu log'una da
             yazıldı).
           </p>
         )}
 
-        {error && <p className="text-sm text-rose-600">{error}</p>}
+        {error && (
+          <div className="alert alert-danger" role="alert">
+            <TriangleAlert size={16} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+            <p>{error}</p>
+          </div>
+        )}
 
         <button className="btn-primary w-full" disabled={busy || code.length < 4}>
           Giriş yap
@@ -174,13 +180,14 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
         <div className="flex items-center justify-between">
           <button
             type="button"
-            className="btn-ghost px-0 text-sm"
+            className="btn-link"
             onClick={() => {
               setStep('phone');
               setError(null);
             }}
           >
-            ← Numarayı değiştir
+            <ArrowLeft size={16} strokeWidth={1.5} aria-hidden />
+            Numarayı değiştir
           </button>
           <span className="muted tabular-nums">
             {secondsLeft > 0
@@ -193,7 +200,7 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
   }
 
   return (
-    <form onSubmit={handleSend} className="card space-y-3">
+    <form onSubmit={handleSend} className="card space-y-5">
       <div>
         <label className="label" htmlFor="phone">
           Cep telefonu
@@ -214,7 +221,7 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
       <label className="flex items-start gap-3 text-sm text-ink-700">
         <input
           type="checkbox"
-          className="mt-0.5 h-5 w-5 shrink-0 accent-plum-600"
+          className="mt-0.5 h-5 w-5 shrink-0 rounded-[2px] accent-plum-600"
           checked={marketingConsent}
           onChange={(e) => setMarketingConsent(e.target.checked)}
         />
@@ -222,7 +229,7 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
           Bakım zamanı hatırlatmaları ve kampanyalar için WhatsApp ile ileti almak istiyorum.{' '}
           <span className="text-ink-500">
             (İsteğe bağlı ·{' '}
-            <Link href="/acik-riza#ticari-ileti" target="_blank" className="underline">
+            <Link href="/acik-riza#ticari-ileti" target="_blank" className="underline underline-offset-2">
               Onay metni
             </Link>
             )
@@ -230,7 +237,12 @@ export function LoginForm({ nextUrl }: { nextUrl: string }) {
         </span>
       </label>
 
-      {error && <p className="text-sm text-rose-600">{error}</p>}
+      {error && (
+        <div className="alert alert-danger" role="alert">
+          <TriangleAlert size={16} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
 
       <button className="btn-primary w-full" disabled={busy || phone.replace(/\D/g, '').length < 10}>
         Kod gönder

@@ -15,6 +15,8 @@
  * `false` iken bileşen `null` döner.
  */
 
+import { Eye, Hourglass } from 'lucide-react';
+
 export function ViewCountBadge({
   count,
   optIn,
@@ -26,8 +28,9 @@ export function ViewCountBadge({
   if (!optIn || count < 2) return null;
 
   return (
-    <span className="badge bg-amber-50 text-amber-800" title="Gerçek görüntülenme sayısı">
-      👀 {count} kişi baktı
+    <span className="badge bg-warning-50 text-warning-600" title="Gerçek görüntülenme sayısı">
+      <Eye size={14} strokeWidth={1.5} aria-hidden />
+      {count} kişi baktı
     </span>
   );
 }
@@ -42,7 +45,7 @@ export function ScarcityBadge({
   if (!optIn || remainingSlots === 0 || remainingSlots > 3) return null;
 
   return (
-    <span className="badge bg-rose-50 text-rose-700">
+    <span className="badge bg-danger-50 text-danger-700">
       Bugün {remainingSlots} uygun saat kaldı
     </span>
   );
@@ -58,7 +61,7 @@ export function OpportunityBadge({
   if (discountRate <= 0) return null;
 
   return (
-    <span className="badge bg-emerald-50 text-emerald-700">
+    <span className="badge bg-success-50 text-success-700">
       %{Math.round(discountRate * 100)} {label}
     </span>
   );
@@ -71,10 +74,11 @@ export function OpportunityBadge({
 export function ShadowBadge() {
   return (
     <span
-      className="badge bg-plum-50 text-plum-700"
+      className="badge bg-brass-300/20 text-brass-700"
       title="Bu saat, ustanın başka bir işlemde beklediği süreye denk geliyor"
     >
-      ⏳ Ara saat
+      <Hourglass size={14} strokeWidth={1.5} aria-hidden />
+      Ara saat
     </span>
   );
 }

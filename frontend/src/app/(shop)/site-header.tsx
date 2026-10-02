@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { SiteInstallButton } from '@/components/pwa/InstallButton';
@@ -47,23 +48,16 @@ export function SiteHeader({
         isHome ? 'fixed inset-x-0 top-0' : 'sticky top-0 border-b border-sand-200'
       } ${transparent ? 'bg-transparent' : 'border-b border-sand-200 bg-sand-50/90 backdrop-blur'}`}
     >
-      <div className="bleed flex items-center justify-between py-3">
-        <Link href="/" className="flex items-center gap-2">
+      <div className="bleed flex h-16 items-center justify-between gap-4 md:h-[72px]">
+        <Link href="/" className="flex min-w-0 items-baseline gap-2">
           <span
-            className={`grid h-9 w-9 place-items-center rounded-xl text-sm font-semibold ${
-              transparent ? 'bg-white/20 text-white backdrop-blur' : 'bg-plum-600 text-white'
-            }`}
-          >
-            A
-          </span>
-          <span
-            className={`display text-base ${transparent ? 'text-white drop-shadow' : 'text-ink-900'}`}
+            className={`display truncate whitespace-nowrap text-lg sm:text-[22px] md:text-2xl ${transparent ? 'text-white' : 'text-ink-900'}`}
           >
             {salonName}
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav className="hidden items-center gap-5 lg:flex xl:gap-7">
           {links.map((link) => {
             const active =
               link.href === '/' ? pathname === '/' : pathname.startsWith(link.href);
@@ -72,12 +66,16 @@ export function SiteHeader({
                 key={link.href}
                 href={link.href}
                 aria-current={active ? 'page' : undefined}
-                className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
+                className={`whitespace-nowrap border-b py-1 text-xs font-semibold uppercase tracking-[0.14em] transition-colors ${
+                  active ? 'border-brass-500' : 'border-transparent hover:border-brass-500'
+                } ${
                   transparent
-                    ? 'text-white/85 hover:bg-white/15 hover:text-white'
+                    ? active
+                      ? 'text-white'
+                      : 'text-white/85 hover:text-white'
                     : active
-                      ? 'bg-sand-100 text-plum-700'
-                      : 'text-ink-700 hover:bg-sand-100'
+                      ? 'text-ink-900'
+                      : 'text-ink-700 hover:text-ink-900'
                 }`}
               >
                 {link.label}
@@ -86,38 +84,22 @@ export function SiteHeader({
           })}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 md:gap-2">
           <SiteInstallButton transparent={transparent} />
 
-          {customerName ? (
-            <Link
-              href="/hesabim"
-              className={`hidden touch-target items-center rounded-xl px-4 text-sm font-semibold md:inline-flex ${
-                transparent ? 'text-white hover:bg-white/15' : 'text-ink-700 hover:bg-sand-100'
-              }`}
-            >
-              {customerName}
-            </Link>
-          ) : (
-            <Link
-              href="/giris"
-              className={`hidden touch-target items-center rounded-xl px-4 text-sm font-semibold md:inline-flex ${
-                transparent ? 'text-white hover:bg-white/15' : 'text-ink-700 hover:bg-sand-100'
-              }`}
-            >
-              Üye Girişi
-            </Link>
-          )}
-
           <Link
-            href="/randevu"
-            className={`touch-target inline-flex items-center rounded-xl px-4 text-sm font-semibold transition active:scale-[0.98] ${
-              transparent
-                ? 'bg-white text-plum-700 hover:bg-plum-50'
-                : 'bg-plum-600 text-white hover:bg-plum-700'
+            href={customerName ? '/hesabim' : '/giris'}
+            aria-label={customerName ?? 'Üye Girişi'}
+            className={`touch-target hidden items-center justify-center gap-2 rounded-[2px] px-3 text-xs font-semibold uppercase tracking-[0.14em] whitespace-nowrap transition-colors md:inline-flex ${
+              transparent ? 'text-white hover:bg-white/15' : 'text-ink-700 hover:bg-sand-100'
             }`}
           >
-            Randevu al
+            <UserRound size={18} strokeWidth={1.5} aria-hidden />
+            <span className="hidden xl:inline">{customerName ?? 'Üye Girişi'}</span>
+          </Link>
+
+          <Link href="/randevu" className={`btn-sm ${transparent ? 'btn-light' : 'btn-primary'}`}>
+            Randevu Al
           </Link>
         </div>
       </div>

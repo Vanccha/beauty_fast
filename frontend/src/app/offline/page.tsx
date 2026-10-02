@@ -18,10 +18,11 @@ export default function OfflinePage() {
   return (
     <main className="grid min-h-dvh place-items-center px-6 py-[max(2rem,env(safe-area-inset-top))] text-center">
       <div className="max-w-sm">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icons/icon-192.png" alt="" width={72} height={72} className="mx-auto rounded-2xl" />
-        <h1 className="display mt-6 text-2xl">Bağlantı yok</h1>
-        <p className="muted mt-3">
+        <p className="display text-4xl text-plum-600">Aurora</p>
+        <p className="eyebrow mt-1">Beauty Studio</p>
+        <div className="mx-auto mt-8 h-px w-12 bg-brass-500" aria-hidden />
+        <h1 className="display mt-8 text-2xl">Bağlantı yok</h1>
+        <p className="muted mt-3 leading-relaxed">
           Şu anda internete bağlı görünmüyorsun. Randevu saatleri canlı olarak kontrol edildiği için
           bağlantı gelince devam edebilirsin.
         </p>

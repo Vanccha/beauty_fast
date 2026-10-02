@@ -1,5 +1,6 @@
 'use client';
 
+import { Download, Share } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { isStandalone, promptInstall, useCanInstall, useIsIosSafari } from './install';
@@ -9,26 +10,6 @@ function useIsStandalone(): boolean {
   const [standalone, setStandalone] = useState(false);
   useEffect(() => setStandalone(isStandalone()), []);
   return standalone;
-}
-
-function DownloadIcon() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      width={18}
-      height={18}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 3v12" />
-      <path d="m7 10 5 5 5-5" />
-      <path d="M5 21h14" />
-    </svg>
-  );
 }
 
 /**
@@ -77,32 +58,30 @@ export function SiteInstallButton({ transparent }: { transparent: boolean }) {
         onClick={onClick}
         aria-label="Uygulamayı yükle"
         aria-expanded={canInstall ? undefined : helpOpen}
-        className={`touch-target inline-flex items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold transition active:scale-[0.98] ${
-          transparent
-            ? 'text-white ring-1 ring-white/40 hover:bg-white/15'
-            : 'text-plum-700 ring-1 ring-plum-100 hover:bg-plum-50'
+        className={`touch-target inline-flex items-center justify-center gap-2 rounded-[2px] px-2.5 text-xs font-semibold uppercase tracking-[0.14em] transition-colors md:px-3 ${
+          transparent ? 'text-white hover:bg-white/15' : 'text-ink-700 hover:bg-plum-50 hover:text-plum-600'
         }`}
       >
-        <DownloadIcon />
-        <span className="hidden md:inline">Uygulamayı yükle</span>
+        <Download size={18} strokeWidth={1.5} aria-hidden />
+        <span className="hidden whitespace-nowrap xl:inline">Uygulamayı yükle</span>
       </button>
 
       {helpOpen && (
         <div
           role="dialog"
           aria-label="Ana ekrana ekleme"
-          className="card absolute right-0 top-full z-40 mt-2 w-72 text-ink-900 shadow-lg"
+          className="card absolute right-0 top-full z-40 mt-2 w-72 !p-5 text-ink-900 shadow-[0_12px_32px_-12px_rgb(34_30_27/0.18)]"
         >
           <div className="flex items-start gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/icon-192.png" alt="" width={40} height={40} className="shrink-0 rounded-xl" />
+            <img src="/icons/icon-192.png" alt="" width={40} height={40} className="shrink-0 rounded-[2px]" />
             <p className="muted">
-              Safari&apos;de <span aria-hidden>⎋</span>
+              Safari&apos;de <Share size={14} strokeWidth={1.5} aria-hidden className="inline align-[-2px]" />
               <strong className="font-semibold"> Paylaş</strong> düğmesine, ardından{' '}
               <strong className="font-semibold">Ana Ekrana Ekle</strong>&apos;ye dokun.
             </p>
           </div>
-          <button type="button" className="btn-ghost mt-3 w-full py-2" onClick={() => setHelpOpen(false)}>
+          <button type="button" className="btn-ghost btn-sm mt-3 w-full" onClick={() => setHelpOpen(false)}>
             Tamam
           </button>
         </div>
