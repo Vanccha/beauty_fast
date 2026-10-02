@@ -22,17 +22,17 @@ export function TierProgress({
     <div className="card">
       <div className="flex items-baseline justify-between">
         <div>
-          <p className="muted">Sadakat seviyesi</p>
-          <p className="text-xl font-semibold text-plum-700">{progress.current}</p>
+          <p className="eyebrow">Sadakat seviyesi</p>
+          <p className="display mt-1 text-2xl text-brass-700">{progress.current}</p>
         </div>
         <div className="text-right">
-          <p className="text-xl font-semibold tabular-nums">{Math.round(points)}</p>
+          <p className="display text-2xl tabular-nums">{Math.round(points)}</p>
           <p className="muted">puan ≈ {formatTl(points * 0.1)}</p>
         </div>
       </div>
 
       <div
-        className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-sand-200"
+        className="mt-4 h-0.5 w-full overflow-hidden bg-sand-200"
         role="progressbar"
         aria-valuenow={Math.round(progress.ratio * 100)}
         aria-valuemin={0}
@@ -40,7 +40,7 @@ export function TierProgress({
         aria-label="Sonraki seviyeye ilerleme"
       >
         <div
-          className="h-full rounded-full bg-plum-500 transition-[width] duration-500"
+          className="h-full bg-plum-600 transition-[width] duration-500"
           style={{ width: `${Math.round(progress.ratio * 100)}%` }}
         />
       </div>

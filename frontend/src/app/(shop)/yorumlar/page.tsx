@@ -1,3 +1,4 @@
+import { Star } from 'lucide-react';
 import Link from 'next/link';
 
 import { ReviewCard } from '@/components/marketing/ReviewCard';
@@ -66,10 +67,10 @@ export default async function ReviewsPage({
   };
 
   return (
-    <div className="page-shell space-y-6 pt-6">
-      <header>
+    <div className="page-shell space-y-8 pb-16 pt-8 md:pt-12">
+      <header className="reveal">
         <p className="eyebrow">Değerlendirmeler</p>
-        <h1 className="display mt-2 text-2xl md:text-3xl">Müşteri yorumları</h1>
+        <h1 className="display mt-2 text-3xl md:text-5xl">Müşteri yorumları</h1>
         <p className="muted mt-2 max-w-2xl">
           Yorumların tamamı, salonda tamamlanmış bir randevusu olan müşteriler tarafından
           yazılmıştır. Puanlar düzenlenmez veya seçilerek gösterilmez.
@@ -99,15 +100,13 @@ export default async function ReviewsPage({
                 return (
                   <li key={star} className="flex items-center gap-2 text-xs text-ink-500">
                     <span className="w-3 tabular-nums">{star}</span>
-                    <span aria-hidden className="text-amber-400">
-                      ★
-                    </span>
+                    <Star size={12} strokeWidth={1.5} aria-hidden className="fill-brass-500 text-brass-500" />
                     <span
                       aria-hidden
-                      className="h-1.5 flex-1 overflow-hidden rounded-full bg-sand-100"
+                      className="h-1.5 flex-1 overflow-hidden bg-sand-100"
                     >
                       <span
-                        className="block h-full rounded-full bg-plum-500"
+                        className="block h-full bg-plum-600"
                         style={{ width: `${ratio}%` }}
                       />
                     </span>
@@ -120,18 +119,18 @@ export default async function ReviewsPage({
 
           {/* Filtreler — JavaScript'siz çalışır */}
           <div className="space-y-2">
-            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+            <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 md:mx-0 md:px-0">
               <FilterChip href={linkTo({ puan: undefined })} active={!minRating}>
                 Tüm puanlar
               </FilterChip>
               {([5, 4, 3] as const).map((star) => (
                 <FilterChip key={star} href={linkTo({ puan: star })} active={minRating === star}>
-                  {star}★ ve üzeri
+                  {star} yıldız ve üzeri
                 </FilterChip>
               ))}
             </div>
 
-            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+            <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 md:mx-0 md:px-0">
               <FilterChip href={minRating ? `/yorumlar?puan=${minRating}` : '/yorumlar'} active={!staffId}>
                 Tüm ekip
               </FilterChip>
@@ -150,7 +149,7 @@ export default async function ReviewsPage({
           {reviews.length === 0 ? (
             <p className="card">
               Bu filtreye uyan yorum yok.{' '}
-              <Link href="/yorumlar" className="font-medium text-plum-700">
+              <Link href="/yorumlar" className="btn-link">
                 Filtreyi temizle
               </Link>
             </p>
@@ -169,8 +168,8 @@ export default async function ReviewsPage({
         </>
       )}
 
-      <div className="card bg-plum-50/60 text-center">
-        <p className="font-semibold">Sen de değerlendirmek ister misin?</p>
+      <div className="card bg-sand-100 text-center">
+        <p className="display text-2xl">Sen de değerlendirmek ister misin?</p>
         <p className="muted mx-auto mt-1 max-w-md">
           Tamamlanan randevularına Hesabım sayfasından puan verebilir, yorumunu yazabilirsin.
         </p>
@@ -196,11 +195,7 @@ function FilterChip({
     <Link
       href={href}
       aria-current={active ? 'true' : undefined}
-      className={`touch-target inline-flex shrink-0 items-center rounded-full border px-4 text-sm font-medium ${
-        active
-          ? 'border-plum-600 bg-plum-600 text-white'
-          : 'border-sand-300 bg-white text-ink-700 hover:bg-sand-100'
-      }`}
+      className={`chip shrink-0 ${active ? 'chip-active' : ''}`}
     >
       {children}
     </Link>

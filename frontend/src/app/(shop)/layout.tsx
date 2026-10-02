@@ -1,3 +1,4 @@
+import { CalendarDays, House, Images, UserRound } from 'lucide-react';
 import Link from 'next/link';
 
 import { serverApi, type MeResponse, type SalonInfo } from '@/lib/server-api';
@@ -29,10 +30,10 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
   };
 
   const links = [
-    { href: '/', label: 'Ana Sayfa', icon: '🏠' },
-    { href: '/randevu', label: 'Randevu', icon: '📅' },
-    { href: '/portfolyo', label: 'Portfolyo', icon: '✨' },
-    { href: '/hesabim', label: 'Hesabım', icon: '👤' },
+    { href: '/', label: 'Ana Sayfa', icon: <House size={20} strokeWidth={1.5} /> },
+    { href: '/randevu', label: 'Randevu', icon: <CalendarDays size={20} strokeWidth={1.5} /> },
+    { href: '/portfolyo', label: 'Portfolyo', icon: <Images size={20} strokeWidth={1.5} /> },
+    { href: '/hesabim', label: 'Hesabım', icon: <UserRound size={20} strokeWidth={1.5} /> },
   ];
 
   // Üst barda gösterilen ama alt çubuğa sığmayan ek sayfalar.
@@ -46,18 +47,18 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
         links={[...links, ...secondaryLinks]}
       />
 
-      <main className="flex-1 pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-12">{children}</main>
+      <main className="flex-1">{children}</main>
 
       {/* ================= ALT BİLGİ ================= */}
-      <footer className="mt-12 border-t border-sand-200 bg-white">
-        <div className="bleed grid gap-8 py-10 sm:grid-cols-2 md:grid-cols-3">
+      <footer className="mt-20 bg-ink-900 pb-[calc(4.5rem+env(safe-area-inset-bottom))] text-sand-200/80 lg:pb-0">
+        <div className="bleed grid gap-10 py-14 sm:grid-cols-2 md:grid-cols-3">
           <div>
-            <p className="display text-lg">{branch.salon.name}</p>
-            <p className="muted mt-2 max-w-xs">{branch.address}</p>
+            <p className="display text-2xl text-sand-50">{branch.salon.name}</p>
+            <p className="mt-3 max-w-xs text-sm text-sand-200/70">{branch.address}</p>
             {branch.salon.phone && (
               <a
                 href={`tel:0${branch.salon.phone}`}
-                className="mt-3 inline-flex text-sm font-medium text-plum-700"
+                className="mt-4 inline-flex text-sm font-medium text-sand-50 hover:text-brass-300"
               >
                 0{branch.salon.phone}
               </a>
@@ -65,11 +66,11 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
           </div>
 
           <nav aria-label="Alt gezinme">
-            <p className="text-sm font-semibold">Sayfalar</p>
-            <ul className="mt-3 space-y-2">
+            <p className="eyebrow !text-brass-300">Sayfalar</p>
+            <ul className="mt-4 space-y-2.5">
               {[...links, ...secondaryLinks].map((l) => (
                 <li key={l.href}>
-                  <Link href={l.href} className="text-sm text-ink-500 hover:text-plum-700">
+                  <Link href={l.href} className="text-sm text-sand-200/80 transition-colors hover:text-sand-50">
                     {l.label}
                   </Link>
                 </li>
@@ -78,30 +79,30 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
           </nav>
 
           <div>
-            <p className="text-sm font-semibold">Randevu</p>
-            <p className="muted mt-3">
+            <p className="eyebrow !text-brass-300">Randevu</p>
+            <p className="mt-4 text-sm text-sand-200/70">
               Uygun saatleri üye olmadan görebilirsin. Randevu için tek adımlık telefon
               doğrulaması yeterli.
             </p>
-            <Link href="/randevu" className="btn-primary mt-4 inline-flex">
+            <Link href="/randevu" className="btn-light btn-sm mt-5 inline-flex">
               Randevu al
             </Link>
           </div>
         </div>
 
-        <div className="border-t border-sand-100 py-4">
-          <div className="bleed flex flex-col gap-2 text-xs text-ink-500 sm:flex-row sm:items-center sm:justify-between">
+        <div className="border-t border-white/10 py-5">
+          <div className="bleed flex flex-col gap-2 text-xs text-sand-200/60 sm:flex-row sm:items-center sm:justify-between">
             <p>
               © {new Date().getFullYear()} {branch.salon.name} · {branch.name}
             </p>
             <nav aria-label="Yasal metinler" className="flex flex-wrap gap-x-4 gap-y-1">
-              <Link href="/kvkk" className="hover:text-plum-700">
+              <Link href="/kvkk" className="transition-colors hover:text-sand-50">
                 KVKK Aydınlatma Metni
               </Link>
-              <Link href="/acik-riza" className="hover:text-plum-700">
+              <Link href="/acik-riza" className="transition-colors hover:text-sand-50">
                 Açık Rıza Metinleri
               </Link>
-              <Link href="/cerez-politikasi" className="hover:text-plum-700">
+              <Link href="/cerez-politikasi" className="transition-colors hover:text-sand-50">
                 Çerez Politikası
               </Link>
             </nav>
@@ -111,7 +112,7 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
 
       {/* Mobil alt gezinme — başparmakla erişilebilir bölge */}
       {/* Ana ekran çubuğu (iPhone) altında kalmasın diye güvenli alan kadar iç boşluk. */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-sand-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-sand-200 bg-sand-50/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
         <div className="mx-auto flex max-w-5xl">
           {links.map((l) => (
             <NavLink key={l.href} href={l.href} variant="bottom" icon={l.icon}>

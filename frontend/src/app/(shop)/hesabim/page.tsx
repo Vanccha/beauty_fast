@@ -1,3 +1,4 @@
+import { ArrowRight, Link2 } from 'lucide-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
@@ -81,9 +82,12 @@ export default async function AccountPage() {
   };
 
   return (
-    <div className="page-shell space-y-5 pt-6">
-      <div className="flex items-center justify-between">
-        <h1 className="section-title">Merhaba {fresh.firstName}</h1>
+    <div className="page-shell space-y-12 pb-12 pt-10 md:pt-14">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <p className="eyebrow">Hesabım</p>
+          <h1 className="display mt-2 text-3xl md:text-4xl">Merhaba {fresh.firstName}</h1>
+        </div>
         <LogoutButton />
       </div>
 
@@ -94,13 +98,22 @@ export default async function AccountPage() {
       />
 
       {/* ---------------- Yaklaşan ---------------- */}
-      <section className="space-y-2">
-        <h2 className="section-title">Yaklaşan randevularım</h2>
+      <section className="space-y-4">
+        <div>
+          <p className="eyebrow">Randevular</p>
+          <h2 className="section-title mt-1">Yaklaşan randevularım</h2>
+        </div>
         {upcoming.length === 0 ? (
           <div className="card">
             <p className="muted">Planlanmış randevun yok.</p>
-            <Link href="/randevu" className="btn-primary mt-3 w-full">
+            <Link href="/randevu" className="btn-primary group mt-4 w-full">
               Randevu al
+              <ArrowRight
+                size={16}
+                strokeWidth={1.5}
+                aria-hidden
+                className="transition-transform duration-200 group-hover:translate-x-0.5"
+              />
             </Link>
           </div>
         ) : (
@@ -108,24 +121,24 @@ export default async function AccountPage() {
             <article key={a.id} className="card">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-medium">{formatDateTr(a.date)}</p>
-                  <p className="muted">
+                  <p className="font-medium tabular-nums">{formatDateTr(a.date)}</p>
+                  <p className="muted tabular-nums">
                     {minutesToLabel(a.startMin)} – {minutesToLabel(a.endMin)} · {a.staff.name}
                   </p>
                   <p className="mt-1 text-sm">
                     {a.items.map((i) => i.service.name).join(' + ')}
                   </p>
                   {a.isOpportunity && (
-                    <span className="badge mt-2 bg-emerald-50 text-emerald-700">
+                    <span className="badge mt-2 bg-success-50 text-success-700">
                       Fırsat saati · %{Math.round(a.discountRate * 100)} indirim
                     </span>
                   )}
                 </div>
-                <span className="shrink-0 font-semibold">{formatTl(a.totalPrice)}</span>
+                <span className="shrink-0 font-semibold tabular-nums">{formatTl(a.totalPrice)}</span>
               </div>
 
               {a.designRefs.length > 0 && (
-                <div className="mt-3 flex gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
                   {a.designRefs.map((d) =>
                     d.source === 'UPLOAD' ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -133,7 +146,7 @@ export default async function AccountPage() {
                         key={d.id}
                         src={d.url}
                         alt="Tasarım referansı"
-                        className="h-16 w-16 rounded-lg object-cover"
+                        className="h-16 w-16 rounded-[2px] object-cover"
                       />
                     ) : (
                       <a
@@ -143,7 +156,8 @@ export default async function AccountPage() {
                         rel="noreferrer noopener"
                         className="badge bg-sand-100 text-ink-700"
                       >
-                        🔗 Referans bağlantısı
+                        <Link2 size={14} strokeWidth={1.5} aria-hidden />
+                        Referans bağlantısı
                       </a>
                     ),
                   )}
@@ -158,11 +172,14 @@ export default async function AccountPage() {
 
       {/* ---------------- Albüm ---------------- */}
       {photos.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="section-title">İşlem albümüm</h2>
+        <section className="space-y-4">
+          <div>
+            <p className="eyebrow">Albüm</p>
+            <h2 className="section-title mt-1">İşlem albümüm</h2>
+          </div>
           <div className="grid grid-cols-3 gap-2">
             {photos.map((p) => (
-              <figure key={p.id} className="overflow-hidden rounded-xl border border-sand-200 bg-white">
+              <figure key={p.id} className="overflow-hidden rounded-[2px] border border-sand-200 bg-white">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={p.imageUrl}
@@ -182,25 +199,28 @@ export default async function AccountPage() {
       )}
 
       {/* ---------------- Geçmiş ---------------- */}
-      <section className="space-y-2">
-        <h2 className="section-title">Geçmiş randevularım</h2>
+      <section className="space-y-4">
+        <div>
+          <p className="eyebrow">Geçmiş</p>
+          <h2 className="section-title mt-1">Geçmiş randevularım</h2>
+        </div>
         {past.length === 0 ? (
           <p className="muted">Henüz tamamlanmış randevun yok.</p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {past.slice(0, 20).map((a) => (
               <li key={a.id} className="card">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium">{formatDateTr(a.date)}</p>
+                    <p className="text-sm font-medium tabular-nums">{formatDateTr(a.date)}</p>
                     <p className="muted">{a.items.map((i) => i.service.name).join(' + ')}</p>
                   </div>
                   <span
                     className={`badge ${
                       a.status === 'COMPLETED'
-                        ? 'bg-emerald-50 text-emerald-700'
+                        ? 'bg-success-50 text-success-700'
                         : a.status === 'NO_SHOW'
-                          ? 'bg-rose-50 text-rose-700'
+                          ? 'bg-danger-50 text-danger-700'
                           : 'bg-sand-100 text-ink-500'
                     }`}
                   >
@@ -219,7 +239,7 @@ export default async function AccountPage() {
                 */}
                 {a.status === 'COMPLETED' &&
                   (a.review ? (
-                    <p className="muted mt-3 border-t border-sand-100 pt-3">
+                    <p className="muted mt-3 border-t border-sand-200 pt-4">
                       Bu randevuyu değerlendirdin. Teşekkürler!
                     </p>
                   ) : (

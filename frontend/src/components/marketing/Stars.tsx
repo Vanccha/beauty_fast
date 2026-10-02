@@ -30,7 +30,7 @@ export function Stars({
         <svg
           key={i}
           viewBox="0 0 20 20"
-          className={`${box} shrink-0 ${filled ? 'text-amber-400' : 'text-sand-300'}`}
+          className={`${box} shrink-0 ${filled ? 'text-brass-500' : 'text-sand-300'}`}
           fill="currentColor"
         >
           <path d="M10 1.6l2.47 5.006 5.526.803-3.998 3.897.944 5.503L10 14.21l-4.942 2.599.944-5.503L2.004 7.41l5.526-.803z" />

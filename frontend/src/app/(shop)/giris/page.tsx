@@ -31,19 +31,20 @@ export default async function LoginPage({
   if (me.customer) redirect(nextUrl);
 
   return (
-    <div className="mx-auto max-w-md space-y-4 px-4 py-8">
+    <div className="mx-auto max-w-md space-y-8 px-5 py-12 md:py-20">
       <div className="text-center">
-        <h1 className="text-2xl font-semibold">Üye Girişi</h1>
-        <p className="mt-2 muted">
+        <p className="eyebrow">Aurora</p>
+        <h1 className="display mt-3 text-4xl">Üye Girişi</h1>
+        <p className="mt-3 muted">
           Şifre yok — telefonuna gelen 6 haneli kodla giriş yaparsın.
         </p>
       </div>
 
       <LoginForm nextUrl={nextUrl} />
 
-      <div className="card bg-sand-100">
-        <h2 className="text-sm font-semibold">Neden üyelik gerekiyor?</h2>
-        <ul className="mt-2 space-y-1 text-sm text-ink-700">
+      <div className="border-t border-sand-200 pt-6">
+        <h2 className="eyebrow">Neden üyelik gerekiyor?</h2>
+        <ul className="mt-3 space-y-1.5 text-sm text-ink-700">
           <li>• Randevunu iptal edebilmen ve geçmişini görebilmen için</li>
           <li>• Ustanın alerji/tercih notlarını doğru kişiye bağlayabilmek için</li>
           <li>• Sadakat puanlarının birikmesi için</li>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { CircleCheck, Star, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 
 import { ApiError, apiSend } from '@/lib/api-client';
@@ -49,9 +50,10 @@ export function ReviewForm({
 
   if (done) {
     return (
-      <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">
-        Değerlendirmen için teşekkürler! Yorumun yayınlandı.
-      </p>
+      <div className="alert alert-success mt-4" role="status">
+        <CircleCheck size={16} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+        <p>Değerlendirmen için teşekkürler! Yorumun yayınlandı.</p>
+      </div>
     );
   }
 
@@ -60,7 +62,7 @@ export function ReviewForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-3 text-sm font-medium text-plum-700 underline-offset-4 hover:underline"
+        className="btn-link mt-4"
       >
         Bu randevuyu değerlendir
       </button>
@@ -70,7 +72,7 @@ export function ReviewForm({
   const remaining = 10 - comment.trim().length;
 
   return (
-    <form onSubmit={submit} className="mt-3 space-y-3 border-t border-sand-100 pt-3">
+    <form onSubmit={submit} className="mt-4 space-y-4 border-t border-sand-200 pt-4">
       <fieldset>
         <legend className="label">{serviceNames} — kaç yıldız?</legend>
         <div className="flex gap-1">
@@ -85,16 +87,15 @@ export function ReviewForm({
                 className="peer sr-only"
               />
               <span className="sr-only">{star} yıldız</span>
-              <svg
-                viewBox="0 0 20 20"
+              <Star
+                size={28}
+                strokeWidth={1.5}
                 aria-hidden
-                className={`h-8 w-8 transition ${
-                  star <= rating ? 'text-amber-400' : 'text-sand-300'
-                } peer-focus-visible:ring-2 peer-focus-visible:ring-plum-500`}
+                className={`transition ${
+                  star <= rating ? 'text-brass-500' : 'text-sand-300'
+                } peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-plum-600`}
                 fill="currentColor"
-              >
-                <path d="M10 1.6l2.47 5.006 5.526.803-3.998 3.897.944 5.503L10 14.21l-4.942 2.599.944-5.503L2.004 7.41l5.526-.803z" />
-              </svg>
+              />
             </label>
           ))}
         </div>
@@ -119,17 +120,22 @@ export function ReviewForm({
         </p>
       </div>
 
-      {error && <p className="text-sm text-rose-600">{error}</p>}
+      {error && (
+        <div className="alert alert-danger" role="alert">
+          <TriangleAlert size={16} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
 
       <p className="text-xs text-ink-500">
         Yorumun adının baş harfleriyle yayınlanır (örn. “Ayşe K.”).
       </p>
 
       <div className="flex gap-2">
-        <button type="button" className="btn-secondary flex-1" onClick={() => setOpen(false)}>
+        <button type="button" className="btn-secondary btn-sm flex-1" onClick={() => setOpen(false)}>
           Vazgeç
         </button>
-        <button type="submit" className="btn-primary flex-1" disabled={busy || remaining > 0}>
+        <button type="submit" className="btn-primary btn-sm flex-1" disabled={busy || remaining > 0}>
           {busy ? 'Gönderiliyor…' : 'Yorumu gönder'}
         </button>
       </div>

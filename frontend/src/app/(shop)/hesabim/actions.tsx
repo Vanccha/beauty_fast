@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { LogOut, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 
 import { ApiError, apiSend } from '@/lib/api-client';
@@ -49,17 +50,22 @@ export function AppointmentActions({
   }
 
   return (
-    <div className="mt-3 border-t border-sand-100 pt-3">
-      {error && <p className="mb-2 text-sm text-rose-600">{error}</p>}
+    <div className="mt-4 border-t border-sand-200 pt-4">
+      {error && (
+        <div className="alert alert-danger mb-3" role="alert">
+          <TriangleAlert size={16} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
 
       {confirming ? (
         <div className="flex gap-2">
-          <button type="button" className="btn-secondary flex-1" onClick={() => setConfirming(false)}>
+          <button type="button" className="btn-secondary btn-sm flex-1" onClick={() => setConfirming(false)}>
             Vazgeç
           </button>
           <button
             type="button"
-            className="btn flex-1 bg-rose-600 text-white hover:bg-rose-700"
+            className="btn-danger btn-sm flex-1"
             disabled={busy}
             onClick={() => void cancel()}
           >
@@ -67,7 +73,7 @@ export function AppointmentActions({
           </button>
         </div>
       ) : (
-        <button type="button" className="btn-ghost text-rose-600" onClick={() => setConfirming(true)}>
+        <button type="button" className="btn-link text-danger-600 hover:text-danger-700" onClick={() => setConfirming(true)}>
           Randevuyu iptal et
         </button>
       )}
@@ -80,13 +86,14 @@ export function LogoutButton() {
   return (
     <button
       type="button"
-      className="btn-ghost text-sm"
+      className="btn-ghost btn-sm"
       onClick={async () => {
         await apiSend('/api/auth/logout', 'POST', { scope: 'customer' }).catch(() => undefined);
         router.push('/');
         router.refresh();
       }}
     >
+      <LogOut size={16} strokeWidth={1.5} aria-hidden />
       Çıkış
     </button>
   );

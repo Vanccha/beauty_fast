@@ -12,28 +12,51 @@
  */
 
 @theme {
-  --color-sand-50: #faf7f4;
-  --color-sand-100: #f3ece5;
-  --color-sand-200: #e6dacd;
-  --color-sand-300: #d3c0ab;
+  --color-sand-50: #f7f3ee;
+  --color-sand-100: #f0e9e1;
+  --color-sand-200: #e4dcd2;
+  --color-sand-300: #cfc3b5;
+  --color-sand-400: #b3a595;
 
-  --color-plum-50: #f7f2f7;
-  --color-plum-100: #ecdfec;
-  --color-plum-500: #8d5b7f;
-  --color-plum-600: #77496a;
-  --color-plum-700: #5f3a55;
+  --color-plum-50: #f6eeef;
+  --color-plum-100: #ebd9dc;
+  --color-plum-200: #d6b5bb;
+  --color-plum-300: #b98790;
+  --color-plum-400: #91505e;
+  --color-plum-500: #7e3646;
+  --color-plum-600: #6e2b3a;
+  --color-plum-700: #571f2c;
+  --color-plum-800: #3f1620;
+  --color-plum-900: #2a0f15;
 
-  --color-ink-500: #6b6259;
-  --color-ink-700: #4a423b;
-  --color-ink-900: #2b2521;
+  --color-ink-300: #a39a90;
+  --color-ink-400: #8a8178;
+  --color-ink-500: #6b625a;
+  --color-ink-700: #453e38;
+  --color-ink-900: #221e1b;
+
+  --color-brass-300: #d4bc93;
+  --color-brass-500: #b08d57;
+  --color-brass-700: #7a5b2a;
+
+  --color-success-50: #eef3ef;
+  --color-success-600: #3f6b4f;
+  --color-success-700: #2f5340;
+  --color-danger-50: #f8ecea;
+  --color-danger-600: #a63d2f;
+  --color-danger-700: #85301f;
+  --color-warning-50: #f7f0e3;
+  --color-warning-600: #8a6420;
 
   /*
-   * Vitrin tipografisi: başlıklar için serif, gövde için sistem sans.
-   * Web fontu İNDİRİLMEZ — açılış sayfası ilk boyamada hazır olsun ve
-   * çevrimdışı kurulumda da aynı görünsün diye sistem serifleri
-   * kullanılır (Windows/macOS'ta Georgia, Android'de Noto Serif).
+   * Tipografi: Fraunces (başlık) + Manrope (gövde). Fontlar next/font ile
+   * derleme zamanında kendi sunucumuzdan servis edilir (CDN yok); değişkenler
+   * `layout.tsx` içinde <html> üzerine bağlanır.
    */
-  --font-display: 'Georgia', 'Iowan Old Style', 'Times New Roman', 'Noto Serif', serif;
+  --font-display: var(--font-fraunces), 'Georgia', 'Iowan Old Style', 'Times New Roman', serif;
+  --font-sans: var(--font-manrope), system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 :root {
@@ -47,9 +70,21 @@ html {
 body {
   background: var(--color-sand-50);
   color: var(--color-ink-900);
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  /* Sürükle-bırak takvimde metin seçimi kazayla tetiklenmesin. */
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Çok hafif kâğıt dokusu — yalnızca dekor, etkileşimi engellemez. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
 /* --------------------------------------------------------------------
@@ -69,46 +104,175 @@ body {
   }
 
   .card {
-    @apply rounded-2xl border border-sand-200 bg-white p-4 shadow-sm;
+    @apply rounded-[4px] border border-sand-200 bg-white p-6 md:p-8;
   }
 
   .btn,
   .btn-primary,
   .btn-secondary,
-  .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3
-           text-sm font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed
-           disabled:opacity-50 disabled:active:scale-100;
-    min-height: 2.75rem;
+  .btn-ghost,
+  .btn-light,
+  .btn-outline-light,
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-[2px] border border-transparent px-7
+           whitespace-nowrap text-xs font-semibold uppercase disabled:cursor-not-allowed disabled:opacity-45;
+    min-height: 3rem;
+    letter-spacing: 0.14em;
+    font-family: var(--font-sans);
+    text-decoration: none;
+    transition:
+      color 220ms var(--ease-out-soft),
+      background-color 220ms var(--ease-out-soft),
+      border-color 220ms var(--ease-out-soft),
+      transform 150ms var(--ease-out-soft);
+  }
+
+  .btn:active:not(:disabled),
+  .btn-primary:active:not(:disabled),
+  .btn-secondary:active:not(:disabled),
+  .btn-ghost:active:not(:disabled),
+  .btn-light:active:not(:disabled),
+  .btn-outline-light:active:not(:disabled),
+  .btn-danger:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .btn:focus-visible,
+  .btn-primary:focus-visible,
+  .btn-secondary:focus-visible,
+  .btn-ghost:focus-visible,
+  .btn-light:focus-visible,
+  .btn-outline-light:focus-visible,
+  .btn-danger:focus-visible,
+  .btn-link:focus-visible,
+  .chip:focus-visible {
+    outline: 2px solid var(--color-plum-600);
+    outline-offset: 3px;
   }
 
   .btn-primary {
-    @apply bg-plum-600 text-white hover:bg-plum-700;
+    @apply border-plum-600 bg-plum-600 text-white hover:border-plum-700 hover:bg-plum-700;
   }
 
   .btn-secondary {
-    @apply border border-sand-300 bg-white text-ink-700 hover:bg-sand-100;
+    @apply border-ink-900 bg-transparent text-ink-900 hover:bg-ink-900 hover:text-sand-50;
   }
 
   .btn-ghost {
-    @apply text-ink-700 hover:bg-sand-100;
+    @apply bg-transparent text-ink-700 hover:bg-plum-50 hover:text-plum-600;
+  }
+
+  .btn-light {
+    @apply border-sand-50 bg-sand-50 text-ink-900 hover:border-white hover:bg-white;
+  }
+
+  .btn-outline-light {
+    @apply bg-transparent text-white hover:bg-white hover:text-ink-900;
+    border-color: rgb(255 255 255 / 0.6);
+  }
+
+  .btn-danger {
+    @apply border-danger-600 bg-danger-600 text-white hover:border-danger-700 hover:bg-danger-700;
+  }
+
+  /* Boyut değiştirici: `.btn-primary btn-sm` */
+  .btn-sm {
+    min-height: 2.5rem;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+
+  /* Metin bağlantısı düğmesi — altı çizgisi hover'da soldan dolar. */
+  .btn-link {
+    @apply inline-flex items-center gap-1.5 text-sm font-semibold text-plum-600;
+    letter-spacing: 0.02em;
+    background-image: linear-gradient(currentColor, currentColor);
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0 1px;
+    padding-bottom: 2px;
+    transition:
+      background-size 300ms var(--ease-out-soft),
+      color 220ms var(--ease-out-soft);
+  }
+  .btn-link:hover {
+    background-size: 100% 1px;
+    color: var(--color-plum-700);
+  }
+
+  /* Süzgeç / gün / saat seçicileri */
+  .chip {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-[2px] border border-sand-300 bg-white
+           whitespace-nowrap px-4 text-sm text-ink-700 hover:border-ink-900 disabled:cursor-not-allowed disabled:opacity-45;
+    min-height: 2.5rem;
+    font-variant-numeric: tabular-nums;
+    transition:
+      color 200ms var(--ease-out-soft),
+      background-color 200ms var(--ease-out-soft),
+      border-color 200ms var(--ease-out-soft);
+  }
+  .chip[aria-pressed='true'],
+  .chip-active {
+    @apply border-ink-900 bg-ink-900 text-sand-50;
+  }
+  /* Rezervasyon seçimleri için birincil renk: `chip chip-primary` */
+  .chip-primary[aria-pressed='true'],
+  .chip-primary.chip-active {
+    @apply border-plum-600 bg-plum-600 text-white;
   }
 
   .badge {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium;
+    @apply inline-flex items-center gap-1 rounded-[2px] bg-sand-100 px-2.5 py-1 text-[11px] font-semibold uppercase text-ink-700;
+    letter-spacing: 0.12em;
   }
 
   .field {
-    @apply w-full rounded-xl border border-sand-300 bg-white px-4 py-3 text-base
-           outline-none focus:border-plum-500 focus:ring-2 focus:ring-plum-100;
+    @apply w-full rounded-[2px] border border-sand-300 bg-white px-4 text-[15px] text-ink-900 outline-none
+           placeholder:text-ink-400 focus:border-ink-900 disabled:opacity-60;
+    min-height: 3rem;
+    transition: border-color 200ms var(--ease-out-soft);
+  }
+  textarea.field {
+    @apply py-3;
+  }
+  .field:focus {
+    outline: 1px solid var(--color-ink-900);
+    outline-offset: 0;
+  }
+  .field[aria-invalid='true'] {
+    @apply border-danger-600;
+  }
+  .field[aria-invalid='true']:focus {
+    outline-color: var(--color-danger-600);
   }
 
   .label {
-    @apply mb-1.5 block text-sm font-medium text-ink-700;
+    @apply mb-1.5 block text-xs font-semibold uppercase text-ink-700;
+    letter-spacing: 0.12em;
+  }
+
+  /* Uyarı kutuları: lucide ikon + metin, yan yana. */
+  .alert {
+    @apply flex items-start gap-3 rounded-[2px] border px-4 py-3 text-sm;
+  }
+  .alert-success {
+    @apply border-success-600/30 bg-success-50 text-success-700;
+  }
+  .alert-danger {
+    @apply border-danger-600/30 bg-danger-50 text-danger-700;
+  }
+  .alert-warning {
+    @apply border-warning-600/30 bg-warning-50 text-warning-600;
+  }
+  .alert-info {
+    @apply border-sand-300 bg-sand-100 text-ink-700;
   }
 
   .section-title {
-    @apply text-lg font-semibold text-ink-900;
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    @apply text-2xl leading-tight text-ink-900;
   }
 
   .muted {
@@ -120,44 +284,55 @@ body {
    * ---------------------------------------------------------------- */
 
   /*
-   * Sayfa gövdesi. Kabuk (`(shop)/layout.tsx`) artık kenar boşluğu
-   * uygulamaz; böylece açılış sayfası tam genişlikte fotoğraf
-   * serebilir. Sıradan sayfalar içeriklerini bu sınıfla sarar.
+   * Sayfa gövdesi. Kabuk (`(shop)/layout.tsx`) kenar boşluğu uygulamaz;
+   * böylece açılış sayfası tam genişlikte fotoğraf serebilir.
+   * Yatay kenar boşluğu çentiğe göre büyür (`viewportFit: cover`).
    */
-  /*
-   * Yatay kenar boşluğu çentiğe göre büyür: `viewportFit: cover` ile
-   * telefon yan çevrildiğinde içerik çentiğin altına girmesin.
-   */
-  .page-shell {
-    @apply mx-auto w-full max-w-5xl;
-    padding-left: max(1rem, env(safe-area-inset-left));
-    padding-right: max(1rem, env(safe-area-inset-right));
-  }
-
-  /* Fotoğrafın ekranın iki ucuna kadar taştığı bölümler */
+  .page-shell,
   .bleed {
-    @apply mx-auto w-full max-w-6xl;
-    padding-left: max(1rem, env(safe-area-inset-left));
-    padding-right: max(1rem, env(safe-area-inset-right));
+    @apply mx-auto w-full max-w-[1200px];
+    padding-left: max(1.25rem, env(safe-area-inset-left));
+    padding-right: max(1.25rem, env(safe-area-inset-right));
+  }
+  @media (min-width: 768px) {
+    .page-shell,
+    .bleed {
+      padding-left: max(2rem, env(safe-area-inset-left));
+      padding-right: max(2rem, env(safe-area-inset-right));
+    }
   }
 
   /* Serif başlık — pazarlama bölümlerinin sesi */
   .display {
     font-family: var(--font-display);
-    letter-spacing: -0.015em;
-    font-weight: 600;
+    letter-spacing: -0.01em;
+    font-weight: 400;
+    line-height: 1.1;
   }
 
   /* Hukuki metinler (/kvkk, /acik-riza, /cerez-politikasi) */
+  .legal {
+    font-size: 1rem;
+  }
+  .legal > p,
+  .legal > ul,
+  .legal > ol,
+  .legal > h2,
+  .legal > h3 {
+    max-width: 68ch;
+  }
   .legal h2 {
-    @apply mt-8 scroll-mt-24 text-lg font-semibold text-ink-900;
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+    @apply mt-12 scroll-mt-24 text-2xl font-normal leading-snug text-ink-900;
   }
   .legal h3 {
-    @apply mt-5 font-semibold text-ink-900;
+    font-family: var(--font-display);
+    @apply mt-7 text-lg font-normal text-ink-900;
   }
   .legal p,
   .legal li {
-    @apply text-[0.95rem] leading-relaxed text-ink-700;
+    @apply text-[1rem] leading-[1.75] text-ink-700;
   }
   .legal p {
     @apply mt-3;
@@ -179,14 +354,46 @@ body {
     @apply bg-sand-100 font-semibold;
   }
   .legal a {
-    @apply text-plum-700 underline;
+    @apply text-plum-700 underline underline-offset-2;
   }
 
   /* Başlık üstü küçük etiket: "EKİBİMİZ", "YORUMLAR" */
   .eyebrow {
-    @apply text-xs font-semibold uppercase tracking-[0.18em] text-plum-600;
+    @apply text-[11px] font-semibold uppercase text-brass-700;
+    letter-spacing: 0.18em;
+  }
+
+  /* Giriş animasyonu (CSS-only): fade + 12px yükselme */
+  .reveal {
+    animation: reveal-up 650ms var(--ease-out-soft) both;
   }
 }
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal {
+    animation: none;
+  }
+}
+
 
 /* --------------------------------------------------------------------
  * Takvimde "usta serbest" (pasif / gölge) dilimin görsel dili
@@ -197,12 +404,12 @@ body {
 .shadow-window {
   background-image: repeating-linear-gradient(
     45deg,
-    rgba(141, 91, 127, 0.16) 0px,
-    rgba(141, 91, 127, 0.16) 6px,
+    rgba(110, 43, 58, 0.16) 0px,
+    rgba(110, 43, 58, 0.16) 6px,
     transparent 6px,
     transparent 12px
   );
-  border: 1px dashed rgba(141, 91, 127, 0.55);
+  border: 1px dashed rgba(110, 43, 58, 0.55);
 }
 
 /* Sürükle-bırak sırasında tarayıcının kendi kaydırma/zoom davranışı kapanır. */
