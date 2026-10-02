@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session
 
 from ..auth.rate_limit import Limit, ensure_not_limited, record_hit
 from ..config import config
-from ..core.risk_score import normalize_phone
+from ..core.risk_score import is_valid_mobile, normalize_phone
 from ..errors import AppError
 from ..models import Customer
 from ..time_utils import format_date_tr, minutes_to_label, now_local
@@ -86,8 +86,8 @@ class BeneficiaryBody(BaseModel):
     @classmethod
     def _phone(cls, v: str) -> str:
         phone = normalize_phone(v)
-        if not re.fullmatch(r"5\d{9}", phone):
-            raise ValueError("Geçerli bir cep telefonu numarası girin (5XX XXX XX XX).")
+        if not is_valid_mobile(phone):
+            raise ValueError("Geçerli bir cep telefonu numarası girin (Türkiye: 5XX XXX XX XX; yurtdışı: ülke koduyla, örn. +44 7911 123456).")
         return phone
 
 

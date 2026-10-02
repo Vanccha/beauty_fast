@@ -5,6 +5,7 @@ FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/srv \
     APP_ENV=production \
     UPLOAD_DIR=/data/uploads
 

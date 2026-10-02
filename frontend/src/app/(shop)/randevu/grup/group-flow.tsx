@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { NameEditor } from '@/components/auth/NameEditor';
+import { PhoneInput } from '@/components/auth/PhoneInput';
 import { PhoneVerify, type VerifiedCustomer } from '@/components/auth/PhoneVerify';
 import { CategoryIcon } from '@/components/marketing/CategoryIcon';
 import { ApiError, apiSend, durationLabel, formatTl, timeLabel } from '@/lib/api-client';
+import { formatPhone, isValidMobile, normalizePhone } from '@/lib/phone';
 import { formatDateTr } from '@/lib/time';
 
 /* ------------------------------------------------------------------ */
@@ -132,16 +134,8 @@ function dayChipLabel(key: string): { weekday: string; day: string } {
   };
 }
 
-/** "0532 000 00 00" / "+90 532..." → "5320000000" (karşılaştırma için). */
-function normalizePhone(raw: string): string {
-  let d = raw.replace(/\D/g, '');
-  if (d.startsWith('90') && d.length === 12) d = d.slice(2);
-  if (d.startsWith('0')) d = d.slice(1);
-  return d;
-}
-
 function phoneValid(raw: string): boolean {
-  return /^5\d{9}$/.test(normalizePhone(raw));
+  return isValidMobile(normalizePhone(raw));
 }
 
 function serviceTotalMin(s: Service): number {
@@ -200,7 +194,7 @@ export function GroupFlow({
   function personError(p: Person, index: number): string | null {
     if (includeSelf && index === 0) return null;
     if (p.firstName.trim().length < 1) return 'Ad gerekli.';
-    if (!phoneValid(p.phone)) return 'Geçerli bir cep telefonu gir (05xx...).';
+    if (!phoneValid(p.phone)) return 'Geçerli bir cep telefonu gir (yurtdışı için ülke kodunu seç).';
     const n = normalizePhone(p.phone);
     if (n === selfPhone) return 'Bu numara senin numaran; "Ben de katılıyorum" seçeneğini kullan.';
     const dup = people.some(
@@ -625,7 +619,7 @@ export function GroupFlow({
                   {isSelf ? (
                     <div className="space-y-1">
                       <p className="font-medium">{customer.firstName}</p>
-                      <p className="muted">0{selfPhone}</p>
+                      <p className="muted">{formatPhone(selfPhone)}</p>
                     </div>
                   ) : (
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -647,14 +641,13 @@ export function GroupFlow({
                         <label className="label" htmlFor={`g-phone-${p.key}`}>
                           Telefon
                         </label>
-                        <input
+                        {/* "Ben de katılıyorum" değişince 1. kartın alanları temizlenir: yeni key. */}
+                        <PhoneInput
+                          key={`${p.key}-${includeSelf}`}
                           id={`g-phone-${p.key}`}
-                          className="field"
-                          value={p.phone}
-                          onChange={(e) => updatePerson(i, { phone: e.target.value })}
-                          inputMode="tel"
+                          defaultValue={p.phone}
+                          onChange={(phone) => updatePerson(i, { phone })}
                           autoComplete="off"
-                          placeholder="0532 000 00 00"
                         />
                       </div>
                     </div>

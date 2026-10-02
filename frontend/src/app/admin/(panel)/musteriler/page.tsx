@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { formatTl } from '@/lib/api-client';
 import { adminApi } from '@/lib/admin-api';
+import { formatPhone } from '@/lib/phone';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,7 +105,7 @@ export default async function CustomersPage({
                   {c.firstName} {c.lastName ?? ''}
                 </p>
                 <p className="muted text-xs tabular-nums">
-                  0{c.phone} · {c.visitCount} ziyaret
+                  {formatPhone(c.phone)} · {c.visitCount} ziyaret
                   {c.lastVisitDaysAgo !== null && ` · son ${c.lastVisitDaysAgo} gün önce`}
                 </p>
               </div>

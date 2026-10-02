@@ -1,0 +1,88 @@
+# Uretim kurulumu (tek sunucu, izole Compose projesi "aurora").
+#
+#   cd /opt/aurora/deploy
+#   docker compose --env-file .env up -d --build
+#
+# Disariya YALNIZCA frontend acilir ve o da yalnizca 127.0.0.1'e; trafik
+# sunucudaki nginx'ten (deploy/nginx-beauty.conf) gelir. Veritabani,
+# backend ve WhatsApp gecidi yalnizca kendi ic aginda konusur; sunucudaki
+# diger uygulamalarin portlarina/veritabanina dokunulmaz.
+name: aurora
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aurora
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD gerekli}
+      POSTGRES_DB: aurora
+      TZ: Europe/Istanbul
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aurora -d aurora"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [internal]
+
+  backend:
+    build: ../backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+psycopg://aurora:${POSTGRES_PASSWORD}@db:5432/aurora
+      # Backend disariya acik degil; yalnizca frontend ve WhatsApp gecidi ulasir.
+      FORWARDED_ALLOW_IPS: "*"
+      EVOLUTION_API_URL: http://evolution:8080
+      EVOLUTION_WEBHOOK_URL: http://backend:8000
+    volumes:
+      - uploads:/data/uploads
+    networks: [internal]
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        API_URL: http://backend:8000
+    restart: unless-stopped
+    depends_on: [backend]
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-18310}:3000"
+    networks: [internal]
+
+  evolution:
+    image: evoapicloud/evolution-api:v2.3.6
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SERVER_URL: http://evolution:8080
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:?EVOLUTION_API_KEY gerekli}
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://aurora:${POSTGRES_PASSWORD}@db:5432/aurora?schema=evolution_api
+      DATABASE_CONNECTION_CLIENT_NAME: aurora_evolution
+      CACHE_REDIS_ENABLED: "false"
+      CACHE_LOCAL_ENABLED: "true"
+      CONFIG_SESSION_PHONE_CLIENT: Aurora Salon
+      CONFIG_SESSION_PHONE_NAME: Chrome
+      LOG_LEVEL: ERROR,WARN
+      TZ: Europe/Istanbul
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks: [internal]
+
+volumes:
+  pgdata:
+  uploads:
+  evolution_instances:
+
+networks:
+  internal:
+    name: aurora_internal
