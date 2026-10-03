@@ -71,6 +71,8 @@ def _confirm_body(lock: dict, body: dict, **extra) -> dict:
         "staffId": body["staffId"],
         "startMin": body["startMin"],
         "serviceIds": body["serviceIds"],
+        "privacyNoticeAck": True,
+        "healthDeclaration": True,
         **extra,
     }
 

@@ -159,6 +159,8 @@ def export_customer_data(db: Session, customer_id: int) -> dict:
                 "services": [i.service.name for i in a.items],
                 "totalPrice": a.total_price,
                 "notes": a.notes,
+                "privacyNoticeAckAt": _iso(a.privacy_notice_ack_at),
+                "healthDeclarationAt": _iso(a.health_declaration_at),
             }
             for a in appointments
         ],
@@ -251,7 +253,7 @@ def anonymize_customer(db: Session, customer_id: int, now: datetime | None = Non
     db.execute(
         update(Appointment)
         .where(Appointment.customer_id == customer_id)
-        .values(notes=None)
+        .values(notes=None, privacy_notice_ack_at=None, health_declaration_at=None)
     )
 
     # Telefon unique ve 10 karakter: gercek numarayla cakismayan yer tutucu.

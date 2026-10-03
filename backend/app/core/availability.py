@@ -57,6 +57,9 @@ class Diagnostics:
 class AvailabilityResult:
     slots: list[SlotCandidate]
     diagnostics: Diagnostics
+    #: Mesai icinde, izgaraya oturan ama paketin SIGMADIGI (dolu) baslangic
+    #: dakikalari. Yalnizca saat bilgisi; musteri bilgisi tasimaz.
+    busy_starts: list[int] = field(default_factory=list)
 
 
 @dataclass
@@ -117,6 +120,7 @@ def find_available_slots(data: AvailabilityInput) -> AvailabilityResult:
     )
 
     slots: list[SlotCandidate] = []
+    busy_starts: list[int] = []
 
     for window in work_windows:
         start = ceil_to_grid(max(window.start, data.earliest_start_min), data.grid_minutes)
@@ -130,6 +134,7 @@ def find_available_slots(data: AvailabilityInput) -> AvailabilityResult:
 
             # (1) Blok, calisma penceresi icinde TEK PARCA olmali.
             if not contained_in_any(block, work_windows):
+                busy_starts.append(int(start))
                 start += data.grid_minutes
                 continue
 
@@ -137,6 +142,7 @@ def find_available_slots(data: AvailabilityInput) -> AvailabilityResult:
             #     Paketin pasif dilimleri serbesttir - cakisabilir.
             shifted_busy = shift(layout.staff_busy, start)
             if any(overlaps_any(i, staff_busy) for i in shifted_busy):
+                busy_starts.append(int(start))
                 start += data.grid_minutes
                 continue
 
@@ -151,6 +157,7 @@ def find_available_slots(data: AvailabilityInput) -> AvailabilityResult:
                     resource_ok = False
                     break
             if not resource_ok:
+                busy_starts.append(int(start))
                 start += data.grid_minutes
                 continue
 
@@ -167,6 +174,7 @@ def find_available_slots(data: AvailabilityInput) -> AvailabilityResult:
             is_shadow_fill = host_window is not None or overlaps_any(block, shadow_intervals)
 
             if is_shadow_fill and not package_can_be_guest:
+                busy_starts.append(int(start))
                 start += data.grid_minutes
                 continue
 
@@ -180,11 +188,11 @@ def find_available_slots(data: AvailabilityInput) -> AvailabilityResult:
             )
 
             if len(slots) >= data.limit:
-                return AvailabilityResult(slots, diagnostics)
+                return AvailabilityResult(slots, diagnostics, busy_starts)
 
             start += data.grid_minutes
 
-    return AvailabilityResult(slots, diagnostics)
+    return AvailabilityResult(slots, diagnostics, busy_starts)
 
 
 def collect_shadow_windows(

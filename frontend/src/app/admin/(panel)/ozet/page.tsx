@@ -2,6 +2,7 @@ import { AlertTriangle, ArrowRight, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 
 import { formatTl } from '@/lib/api-client';
+import { appointmentLabel, appointmentTone, depositBadge } from '@/lib/appointment-status';
 import { serverApi } from '@/lib/server-api';
 import { formatDateTr, minutesToLabel } from '@/lib/time';
 
@@ -12,6 +13,7 @@ interface DashboardAppointment {
   startMin: number;
   endMin: number;
   status: string;
+  depositStatus?: string;
   isOpportunity: boolean;
   shadowParentId: number | null;
   customerId: number;
@@ -178,7 +180,14 @@ export default async function AdminOverview() {
                   {a.isOpportunity && (
                     <span className="badge bg-success-50 text-success-700">Fırsat</span>
                   )}
-                  <span className="badge">{a.status}</span>
+                  <span className={`badge ${appointmentTone(a.status, a.depositStatus)}`}>
+                    {appointmentLabel(a.status, a.depositStatus)}
+                  </span>
+                  {depositBadge(a.depositStatus) && (
+                    <span className={`badge ${depositBadge(a.depositStatus)?.tone}`}>
+                      {depositBadge(a.depositStatus)?.label}
+                    </span>
+                  )}
                   <span className="font-semibold tabular-nums">{formatTl(a.totalPrice)}</span>
                 </div>
               </li>

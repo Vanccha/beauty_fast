@@ -116,6 +116,15 @@ class Config:
     evolution_webhook_secret: str
     #: Müşterilere gönderilen bağlantılar için sitenin genel adresi.
     public_site_url: str
+    #: Web Push (VAPID). Bos birakilirsa gelistirmede yerel dosyadan uretilir,
+    #: uretimde push kapali kalir (bkz. ``services/push.py``).
+    vapid_public_key: str
+    vapid_private_key: str
+    vapid_subject: str
+    #: WhatsApp baglanti kontrolu araligi (sn). 0: kapali.
+    whatsapp_health_seconds: int
+    #: Kapora nobetcisi (gecikme / iade hatirlatmasi) araligi (sn). 0: kapali.
+    deposit_watch_seconds: int
 
 
 _app_env = (os.getenv("APP_ENV") or "development").strip().lower()
@@ -147,6 +156,11 @@ config = Config(
     evolution_webhook_secret=os.getenv("EVOLUTION_WEBHOOK_SECRET")
     or ("" if _app_env not in DEV_ENVS else "lokal-webhook-anahtari"),
     public_site_url=(os.getenv("PUBLIC_SITE_URL") or "http://localhost:3000").rstrip("/"),
+    vapid_public_key=(os.getenv("VAPID_PUBLIC_KEY") or "").strip(),
+    vapid_private_key=(os.getenv("VAPID_PRIVATE_KEY") or "").strip(),
+    vapid_subject=(os.getenv("VAPID_SUBJECT") or "mailto:admin@localhost").strip(),
+    whatsapp_health_seconds=max(0, int(os.getenv("WHATSAPP_HEALTH_SECONDS") or 300)),
+    deposit_watch_seconds=max(0, int(os.getenv("DEPOSIT_WATCH_SECONDS") or 60)),
 )
 
 NOTIFICATION_DRIVERS = ("console", "evolution")
@@ -236,6 +250,11 @@ def validate_config(cfg: Config = config) -> list[str]:
         warnings.append(
             "EVOLUTION_WEBHOOK_URL tanımlı değil: gelen mesajlar alınmaz, "
             "karşılama mesajı gitmez."
+        )
+    if not (cfg.vapid_public_key and cfg.vapid_private_key):
+        warnings.append(
+            "VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY tanımlı değil: tarayıcı (Web Push) "
+            "bildirimleri kapalı. Anahtar üretmek için: python -m app.tools.vapid"
         )
     if cfg.public_site_url.startswith("http://localhost"):
         warnings.append("PUBLIC_SITE_URL localhost: müşteriye giden bağlantılar çalışmaz.")

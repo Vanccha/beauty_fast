@@ -36,9 +36,10 @@ from typing import Iterable, Sequence
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from ..core.opportunity import FixedWindowSettings, fixed_window_settings_from_salon
 from ..core.types import ResourceNeed, ServiceSpec
 from ..errors import AppError
-from ..models import Branch, Resource, Service, Staff, StaffService
+from ..models import Branch, Resource, Salon, Service, Staff, StaffService
 
 #: Bir pakette kabul edilen azami hizmet kalemi (tekrarlar dahil).
 MAX_PACKAGE_ITEMS = 10
@@ -57,6 +58,12 @@ def get_default_branch(db: Session) -> Branch:
             "NOT_FOUND", "Şube bulunamadı. Önce `python -m app.seed` çalıştırın.", 404
         )
     return branch
+
+
+def get_discount_settings(db: Session) -> FixedWindowSettings:
+    """Firsat saati indirim ayarlari (tek salon). Fiyat icin TEK kaynak."""
+    salon = db.scalar(select(Salon).order_by(Salon.id).limit(1))
+    return fixed_window_settings_from_salon(salon)
 
 
 def get_exclusive_resource_ids(db: Session, branch_id: int) -> list[int]:

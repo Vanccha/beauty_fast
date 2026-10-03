@@ -33,8 +33,8 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..config import config
-from ..models import ScheduledNotification
-from ..time_utils import now_local
+from ..models import Appointment, ScheduledNotification
+from ..time_utils import now_local, to_date_key
 from . import messaging
 from .privacy import MARKETING_DEDUPE_PREFIX, is_marketing_allowed
 from .whatsapp_inbound import mark_phone_known
@@ -107,6 +107,31 @@ def _claim_due(db: Session, now: datetime, limit: int) -> list[tuple[int, str, s
         ):
             n.status = "CANCELLED"
             continue
+        # Yenileme daveti: musteri bu arada yeniden randevu almissa gereksiz.
+        if n.dedupe_key.startswith(MARKETING_DEDUPE_PREFIX) and db.scalar(
+            select(Appointment.id)
+            .where(
+                Appointment.customer_id == n.customer_id,
+                Appointment.status.in_(("PENDING", "CONFIRMED")),
+                Appointment.date >= to_date_key(now),
+            )
+            .limit(1)
+        ):
+            n.status = "CANCELLED"
+            continue
+        # "Yarin randevunuz var": yalnizca ONAYLI randevuya gider. Kapora
+        # beklenirken (PENDING) atlanir; sonradan odenirse vakti gectiyse
+        # yeniden kurulmaz (``deposit.mark_paid`` -> ``sync_pre_reminder``).
+        if n.dedupe_key.startswith("pre:"):
+            try:
+                appointment_id = int(n.dedupe_key.split(":")[1])
+            except (IndexError, ValueError):
+                appointment_id = None
+            if appointment_id is not None and db.scalar(
+                select(Appointment.status).where(Appointment.id == appointment_id)
+            ) == "PENDING":
+                n.status = "CANCELLED"
+                continue
         n.status = "SENDING"
         n.next_attempt_at = now + CLAIM_LEASE
         claimed.append((n.id, n.customer.phone, n.body))

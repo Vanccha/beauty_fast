@@ -4,10 +4,15 @@ import Link from 'next/link';
 import { adminApi } from '@/lib/admin-api';
 import { addDaysToKey, formatDateTr, isDateKey } from '@/lib/time';
 import { CalendarBoard, type CalendarAppointment, type CalendarStaff } from './calendar-board';
+import type { ServiceGroup, Viewer } from './appointment-sheet';
+import { DepositListsPanel } from './deposit-lists';
+import type { DepositLists, DepositSummary } from '@/lib/deposit';
 
 export const dynamic = 'force-dynamic';
 
 interface CalendarResponse {
+  viewer: Viewer;
+  depositEnabled: boolean;
   date: string;
   dateLabel: string;
   weekday: number;
@@ -35,6 +40,12 @@ interface CalendarResponse {
     totalPrice: number;
     isOpportunity: boolean;
     shadowParentId: number | null;
+    source: string;
+    createdByStaffId: number | null;
+    notes: string | null;
+    discountRate: number;
+    groupId: string | null;
+    deposit: DepositSummary | null;
     customer: { id: number; firstName: string; lastName: string | null; phone: string };
     allergies: { label: string; severity: string }[];
     services: { id: number; name: string }[];
@@ -57,8 +68,14 @@ export default async function CalendarPage({
   const params = await searchParams;
   // Geçersiz/eksik tarihte FastAPI bugünü kullanır; dönen tarih esas alınır.
   const query = params.tarih && isDateKey(params.tarih) ? `?date=${params.tarih}` : '';
-  const data = await adminApi<CalendarResponse>(`/api/admin/calendar${query}`);
+  const [data, options] = await Promise.all([
+    adminApi<CalendarResponse>(`/api/admin/calendar${query}`),
+    adminApi<{ categories: ServiceGroup[] }>('/api/admin/service-options'),
+  ]);
   const date = data.date;
+  // Kapora bekleyen / iade bekleyen listeleri yalnızca yönetici ve sahibe gösterilir.
+  const isManager = data.viewer.role === 'OWNER' || data.viewer.role === 'MANAGER';
+  const depositLists = isManager ? await adminApi<DepositLists>('/api/admin/deposits') : null;
 
   const staff: CalendarStaff[] = data.staff.map((s) => ({
     id: s.id,
@@ -84,6 +101,12 @@ export default async function CalendarPage({
     isShadowChild: a.shadowParentId !== null,
     customerId: a.customer.id,
     customerName: `${a.customer.firstName} ${a.customer.lastName ?? ''}`.trim(),
+    customerPhone: a.customer.phone,
+    source: a.source,
+    notes: a.notes,
+    discountRate: a.discountRate,
+    deposit: a.deposit,
+    groupId: a.groupId,
     serviceNames: a.services.map((x) => x.name),
     serviceIds: a.serviceIds,
     allergyLabels: a.allergies.map((x) => x.label),
@@ -115,14 +138,19 @@ export default async function CalendarPage({
         </div>
       </div>
 
+      {depositLists && <DepositListsPanel lists={depositLists} />}
+
       <CalendarBoard
         date={date}
+        depositEnabled={data.depositEnabled}
         openMinute={data.openMinute}
         closeMinute={data.closeMinute}
         gridMinutes={data.gridMinutes}
         staff={staff}
         appointments={appointments}
         locks={lockRows}
+        viewer={data.viewer}
+        serviceGroups={options.categories}
       />
     </div>
   );

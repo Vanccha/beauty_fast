@@ -34,6 +34,7 @@ os.environ["NOTIFICATION_DRIVER"] = "console"
 os.environ["WHATSAPP_SEND_INTERVAL_MS"] = "0"
 # Arka plan bildirim iscisi testlerde calismaz; kuyruk testleri elle bosaltir.
 os.environ["NOTIFICATION_POLL_SECONDS"] = "0"
+os.environ["DEPOSIT_WATCH_SECONDS"] = "0"
 # Gelistiricinin lokal .env'indeki Evolution ayarlari testlere sizmasin.
 for _key in (
     "EVOLUTION_API_URL", "EVOLUTION_API_KEY", "EVOLUTION_INSTANCE", "EVOLUTION_WEBHOOK_URL",
@@ -56,7 +57,9 @@ from app.models import (  # noqa: E402
     InventoryItem,
     LoyaltyEntry,
     OccupancyCell,
+    AppState,
     PhoneRiskEvent,
+    PushSubscription,
     RateLimitHit,
     Resource,
     ScheduledNotification,
@@ -100,7 +103,7 @@ def db():
 def clean_db(db):
     """Her test temiz bir veritabaniyla baslar."""
     for model in (
-        RateLimitHit, VerificationCode, ScheduledNotification, WhatsappContact, SlotViewEvent,
+        PushSubscription, AppState, RateLimitHit, VerificationCode, ScheduledNotification, WhatsappContact, SlotViewEvent,
         OccupancyCell, SlotLock, StockMovement, LoyaltyEntry, PhoneRiskEvent,
         AppointmentResource, AppointmentItem, Appointment, ServiceConsumable,
         InventoryItem, ServiceResource, StaffService, WorkingHour, Resource,

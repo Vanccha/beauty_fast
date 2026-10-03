@@ -11,7 +11,7 @@ const manrope = Manrope({ subsets: ['latin', 'latin-ext'], display: 'swap', vari
 export const metadata: Metadata = {
   title: 'Aurora Beauty Studio — Randevu',
   description:
-    'Akıllı randevu sistemi: paket süresi hesaplayan, ustanın bekleme sürelerini değerlendiren ve slotu veritabanı seviyesinde kilitleyen kuaför randevu uygulaması.',
+    'Kendinize ayırdığınız en güzel saat. Saç, tırnak, kaş ve cilt bakımında uygun saati görün, dakikası dakikasına planlanan randevunuzu alın.',
   applicationName: 'Aurora',
   // PWA: manifest `app/manifest.ts` tarafından otomatik bağlanır.
   // iOS manifestteki simgeleri okumaz; ana ekran simgesi ve başlık ayrıca verilir.

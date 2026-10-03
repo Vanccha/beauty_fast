@@ -33,6 +33,7 @@ from .auth.password import hash_password
 from .config import config
 from .core.loyalty import calculate_earned_points, tier_for
 from .core.occupancy import build_occupancy_cells
+from .core.opportunity import fixed_window_discount
 from .core.package_layout import LayoutOptions, layout_package
 from .core.reminder_rules import ReminderContext, ReminderRuleSpec, resolve_reminder
 from .core.risk_score import hash_phone
@@ -87,9 +88,6 @@ START_HOUR_WEIGHTS = [
     (14, 5), (15, 6), (16, 7), (17, 8), (18, 6), (19, 3),
 ]
 
-#: Firsat saati indirimi: oglene kadar olan randevulara uygulanir.
-OPPORTUNITY_BEFORE_MIN = 12 * 60
-OPPORTUNITY_DISCOUNT = 0.15
 
 FIRST_NAMES = [
     "Ayşe", "Elif", "Zeynep", "Merve", "Selin", "Büşra", "Ecem", "Deniz",
@@ -751,16 +749,26 @@ def main() -> None:
     # -----------------------------------------------------------------
     reminder_defs = [
         {
-            "name": "Dip boya büyüme kuralı",
+            "name": "Saç boyası yenileme",
             "service_id": services["sac-boyasi"]["id"],
             "category_id": None,
-            "formula": "GROWTH",
-            "base_days": 35,
-            # Sac ~12 mm/ay uzar; 14 mm dip gorunur hale gelir -> ~35 gun.
-            "params": json.dumps({"mmPerMonth": 12, "toleranceMm": 14}),
+            "formula": "FIXED",
+            "base_days": 90,
+            "params": "{}",
             "channel": "WHATSAPP",
-            "template": "{ad}, {hizmet} işleminizin üzerinden {gun} gün geçti. Dipler belirmeden yenileyelim mi? {link}",
-            "priority": 30,
+            "template": "Merhaba {ad}, son {hizmet} işleminizin üzerinden epey zaman geçti. Yenileme zamanı geldiyse size uygun saati ayıralım: {randevu_linki}",
+            "priority": 50,
+        },
+        {
+            "name": "Manikür yenileme",
+            "service_id": services["manikur"]["id"],
+            "category_id": None,
+            "formula": "FIXED",
+            "base_days": 14,
+            "params": "{}",
+            "channel": "WHATSAPP",
+            "template": "Merhaba {ad}, son {hizmet} işleminizin üzerinden epey zaman geçti. Yenileme zamanı geldiyse size uygun saati ayıralım: {randevu_linki}",
+            "priority": 50,
         },
         {
             "name": "Kalıcı oje ürün ömrü",
@@ -1008,8 +1016,9 @@ def main() -> None:
         else:
             status = "CONFIRMED"
 
-        is_opportunity = start_min < OPPORTUNITY_BEFORE_MIN
-        discount_rate = OPPORTUNITY_DISCOUNT if is_opportunity else 0.0
+        # Varsayilan kural: hafta ici 12:00'den once, sabit %10
+        discount_rate = fixed_window_discount(date, start_min)
+        is_opportunity = discount_rate > 0
         total_price = round(layout.total_price * (1 - discount_rate), 2)
 
         appointment = Appointment(

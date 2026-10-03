@@ -37,6 +37,8 @@ from ..models import (
     DesignReference,
     OccupancyCell,
 )
+from .deposit import DepositSettings, deposit_for_price
+from .manual_booking import reclaim_cells, release_cells
 from .soft_lock import assert_lock_valid, conflict_error, sweep_expired_locks
 from ..time_utils import now_local
 
@@ -69,11 +71,17 @@ def confirm_appointment_from_lock(
     booker_customer_id: int | None = None,
     booking_group_id: str | None = None,
     beneficiary_label: str | None = None,
+    privacy_notice_ack_at: datetime | None = None,
+    health_declaration_at: datetime | None = None,
     commit: bool = True,
+    deposit_settings: DepositSettings | None = None,
 ) -> Appointment:
     """``customer_id`` randevunun SAHIBI (alici); baskasi adina randevuda
     ``booker_customer_id`` oturumdaki alandir (kilidin sahipligi onunla
-    dogrulanir). Kendi adina alinirken ikisi aynidir."""
+    dogrulanir). Kendi adina alinirken ikisi aynidir.
+
+    ``deposit_settings`` (kapora): verilir VE acik ise randevu PENDING +
+    AWAITING olusur (slot yine DOLU); aksi halde eskisi gibi CONFIRMED."""
     now = now or now_local()
     booker_customer_id = booker_customer_id or customer_id
     discount_rate = _clamp_rate(discount_rate)
@@ -103,6 +111,9 @@ def confirm_appointment_from_lock(
             )
 
         total_price = round(layout.total_price * (1 - discount_rate), 2)
+        deposit_amount = (
+            deposit_for_price(deposit_settings, total_price) if deposit_settings else None
+        )
 
         # Kilit hucrelerini birak - yerlerine randevu hucreleri yazilacak.
         db.execute(delete(OccupancyCell).where(OccupancyCell.lock_id == lock.id))
@@ -117,12 +128,17 @@ def confirm_appointment_from_lock(
             date=date,
             start_min=start_min,
             end_min=end_min,
-            status="CONFIRMED",
+            status="PENDING" if deposit_amount else "CONFIRMED",
+            deposit_amount=deposit_amount or None,
+            deposit_status="AWAITING" if deposit_amount else "NONE",
+            deposit_requested_at=now if deposit_amount else None,
             total_price=total_price,
             discount_rate=discount_rate,
             is_opportunity=bool(is_opportunity),
             shadow_parent_id=shadow_parent_id,
             notes=notes,
+            privacy_notice_ack_at=privacy_notice_ack_at,
+            health_declaration_at=health_declaration_at,
             version=0,
         )
         db.add(appointment)
@@ -241,7 +257,7 @@ def move_appointment(
             raise AppError("NOT_FOUND", "Randevu bulunamadı.", 404)
         if current.version != expected_version:
             raise VersionConflictError(current.version)
-        if current.status in ("CANCELLED", "COMPLETED"):
+        if current.status in ("CANCELLED", "COMPLETED", "NO_SHOW"):
             raise AppError(
                 "VALIDATION", "Tamamlanmış veya iptal edilmiş randevu taşınamaz.", 400
             )
@@ -250,7 +266,7 @@ def move_appointment(
 
         # Eski hucreleri birak (yeni yer eskisiyle cakisiyorsa kendi kendini
         # engellemesin).
-        db.execute(delete(OccupancyCell).where(OccupancyCell.appointment_id == appointment_id))
+        released = release_cells(db, appointment_id)
 
         cells = build_occupancy_cells(
             layout=layout,
@@ -275,6 +291,8 @@ def move_appointment(
             ]
         )
         db.flush()
+        # Zorla ust uste eklenmis baska randevu varsa serbest kalan hucreleri sahiplenir.
+        reclaim_cells(db, released, exclude_ids=[appointment_id])
 
         # Surum kontrollu guncelleme - asil optimistic locking adimi.
         updated = db.execute(

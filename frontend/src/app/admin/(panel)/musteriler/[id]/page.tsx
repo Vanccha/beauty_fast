@@ -1,12 +1,18 @@
-import { AlertTriangle, ChevronLeft, Eye, Lock } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronLeft, Eye, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { adminApi } from '@/lib/admin-api';
+import {
+  appointmentDot,
+  appointmentLabel,
+  appointmentTone,
+  depositBadge,
+} from '@/lib/appointment-status';
 import { formatTl } from '@/lib/api-client';
 import { formatPhone } from '@/lib/phone';
 import { ApiError } from '@/lib/server-api';
-import { formatDateTr } from '@/lib/time';
+import { formatDateTr, parseDateKey } from '@/lib/time';
 import { AllergyEditor, NoteEditor, PhotoUploader } from './crm-editors';
 
 export const dynamic = 'force-dynamic';
@@ -72,6 +78,7 @@ interface CustomerCard {
     date: string;
     startLabel: string;
     status: string;
+    depositStatus?: string;
     totalPrice: number;
     staffName: string;
     services: string[];
@@ -131,7 +138,9 @@ export default async function CustomerCardPage({
     colors: card.colors,
     campaigns: card.campaigns,
   };
-  const appointments = card.appointments.slice(0, 25);
+  const history = [...card.appointments]
+    .sort((x, y) => `${y.date} ${y.startLabel}`.localeCompare(`${x.date} ${x.startLabel}`))
+    .slice(0, 50);
   const notes = card.notes;
   const photos = card.album.slice(0, 24);
   const allergies = [...card.allergies].sort((a, b) => a.id - b.id);
@@ -273,11 +282,8 @@ export default async function CustomerCardPage({
       <section className="card !p-4">
         <h2 className="eyebrow flex items-center gap-1.5">
           <Lock size={14} strokeWidth={1.5} aria-hidden />
-          Usta notları
+          Notlar
         </h2>
-        <p className="muted">
-          &quot;Yalnızca personel&quot; notları hiçbir müşteri ekranında veya API yanıtında görünmez.
-        </p>
         <ul className="mt-3 space-y-2">
           {notes.map((n) => (
             <li key={n.id} className="rounded-[2px] border border-sand-200 p-3 text-sm">
@@ -329,37 +335,98 @@ export default async function CustomerCardPage({
       {/* ---------------- Randevu geçmişi ---------------- */}
       <section className="card !p-4">
         <h2 className="eyebrow">Randevu geçmişi</h2>
-        <ul className="mt-2 divide-y divide-sand-100">
-          {appointments.map((a) => (
-            <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-              <div>
-                <p className="font-medium tabular-nums">
-                  {formatDateTr(a.date)} · {a.startLabel}
-                </p>
-                <p className="muted">
-                  {a.services.join(' + ')} · {a.staffName}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`badge ${
-                    a.status === 'COMPLETED'
-                      ? 'border border-emerald-300 bg-transparent text-emerald-700'
-                      : a.status === 'NO_SHOW'
-                        ? 'border border-rose-300 bg-transparent text-rose-700'
-                        : a.status === 'CANCELLED'
-                          ? 'border border-sand-200 bg-sand-100 text-ink-500'
-                          : 'border border-sand-300 bg-transparent text-ink-700'
-                  }`}
-                >
-                  {a.status}
-                </span>
-                <span className="font-medium tabular-nums">{formatTl(a.totalPrice)}</span>
-              </div>
-            </li>
-          ))}
-        </ul>
+        {history.length === 0 ? (
+          <p className="muted mt-2">Henüz randevu yok.</p>
+        ) : (
+          <div className="mt-2 space-y-1">
+            {history.slice(0, 8).map((a) => (
+              <AppointmentRow key={a.id} a={a} />
+            ))}
+            {history.length > 8 && (
+              <details className="group/all">
+                <summary className="muted cursor-pointer list-none rounded-xl px-3 py-2 text-center text-sm font-medium hover:bg-sand-50 group-open/all:hidden [&::-webkit-details-marker]:hidden">
+                  Tümünü göster ({history.length})
+                </summary>
+                <div className="space-y-1">
+                  {history.slice(8).map((a) => (
+                    <AppointmentRow key={a.id} a={a} />
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+        )}
       </section>
     </div>
+  );
+}
+
+const SHORT_MONTHS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+
+function formatShortDate(key: string): string {
+  const d = parseDateKey(key);
+  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function AppointmentRow({
+  a,
+}: {
+  a: {
+    id: number;
+    date: string;
+    startLabel: string;
+    staffName: string;
+    services: string[];
+    status: string;
+    depositStatus?: string;
+    totalPrice: number;
+  };
+}) {
+  const first = a.services[0] ?? 'Randevu';
+  const more = a.services.length - 1;
+  return (
+    <details className="group rounded-xl border border-transparent open:border-sand-200 open:bg-sand-50/50">
+      <summary className="flex cursor-pointer list-none items-center gap-3 rounded-xl px-3 py-2.5 text-sm hover:bg-sand-50 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0 flex-1 truncate font-medium">
+          {first}
+          {more > 0 && <span className="muted"> +{more}</span>}
+        </span>
+        <span className="muted shrink-0 tabular-nums">{formatShortDate(a.date)}</span>
+        <span
+          className={`h-2 w-2 shrink-0 rounded-full ${appointmentDot(a.status, a.depositStatus)}`}
+          title={appointmentLabel(a.status, a.depositStatus)}
+          aria-label={appointmentLabel(a.status, a.depositStatus)}
+        />
+        <ChevronDown
+          size={16}
+          strokeWidth={1.5}
+          className="shrink-0 text-ink-500 transition-transform group-open:rotate-180"
+          aria-hidden
+        />
+      </summary>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 px-3 pb-3 pt-1 text-sm">
+        <dt className="muted">Tarih</dt>
+        <dd className="tabular-nums">
+          {formatDateTr(a.date)} · {a.startLabel}
+        </dd>
+        <dt className="muted">Personel</dt>
+        <dd>{a.staffName}</dd>
+        <dt className="muted">Hizmetler</dt>
+        <dd>{a.services.join(' + ')}</dd>
+        <dt className="muted">Durum</dt>
+        <dd>
+          <span className={`badge ${appointmentTone(a.status, a.depositStatus)}`}>
+            {appointmentLabel(a.status, a.depositStatus)}
+          </span>
+          {depositBadge(a.depositStatus) && (
+            <span className={`badge ml-1.5 ${depositBadge(a.depositStatus)?.tone}`}>
+              {depositBadge(a.depositStatus)?.label}
+            </span>
+          )}
+        </dd>
+        <dt className="muted">Ücret</dt>
+        <dd className="font-medium tabular-nums">{formatTl(a.totalPrice)}</dd>
+      </dl>
+    </details>
   );
 }

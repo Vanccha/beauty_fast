@@ -98,7 +98,7 @@ export default async function CustomersPage({
           <li key={c.id}>
             <Link
               href={`/admin/musteriler/${c.id}`}
-              className="card flex flex-wrap items-center justify-between gap-x-3 gap-y-2 !p-3 hover:border-ink-900"
+              className="card flex flex-wrap items-center justify-between gap-x-3 gap-y-2 !p-3 hover:border-plum-300"
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium text-ink-900">

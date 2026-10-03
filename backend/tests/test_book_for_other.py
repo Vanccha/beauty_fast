@@ -72,6 +72,8 @@ def confirm_body(lock, body, **extra):
         "staffId": body["staffId"],
         "startMin": body["startMin"],
         "serviceIds": body["serviceIds"],
+        "privacyNoticeAck": True,
+        "healthDeclaration": True,
         **extra,
     }
 

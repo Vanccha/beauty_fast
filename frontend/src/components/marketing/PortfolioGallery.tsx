@@ -80,7 +80,7 @@ export function PortfolioGallery({
           {visible.map((item) => (
             <figure
               key={item.id}
-              className="group relative aspect-square overflow-hidden rounded-[4px] border border-sand-200 bg-sand-100"
+              className="group relative aspect-square overflow-hidden rounded-2xl border border-sand-200 bg-sand-100"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img

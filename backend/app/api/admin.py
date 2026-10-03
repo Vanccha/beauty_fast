@@ -4,6 +4,12 @@
   GET    /api/admin/calendar                - gun gorunumu (usta x saat)
   PATCH  /api/admin/appointments/{id}/move  - surukle-birak tasima
   PATCH  /api/admin/appointments/{id}/status- durum guncelleme
+  POST   /api/admin/appointments            - panelden elle randevu ekle
+  PATCH  /api/admin/appointments/{id}       - randevu duzenle (hizmet/usta/saat/fiyat/not)
+  POST   /api/admin/appointments/preview    - sure/fiyat/cakisma onizlemesi (yazmaz)
+  POST   /api/admin/appointments/{id}/revert- son durumu geri al (yonetici)
+  GET    /api/admin/customers/search        - randevu formu icin hafif musteri aramasi
+  GET    /api/admin/service-options         - randevu formu icin hizmet listesi
   GET    /api/admin/customers               - musteri listesi + segment
   GET    /api/admin/customers/{id}          - CRM karti (gizli notlar dahil)
   POST   /api/admin/customers/{id}/allergy  - alerji ikazi ekle/sil
@@ -18,11 +24,22 @@
   POST   /api/admin/messaging/logout        - WhatsApp numarasinin baglantisini kes (OWNER)
   GET    /api/admin/messaging/welcome       - ilk mesajda karsilama ayarlari
   PUT    /api/admin/messaging/welcome       - karsilama mesajini ac/kapat, metni degistir
+  GET/PUT /api/admin/messaging/post-visit  - ziyaret sonrasi mesaj ayarlari
+  GET/PUT /api/admin/rebooking             - hizmet bazli yenileme daveti (basit gorunum)
   GET    /api/admin/reviews                 - moderasyon listesi + ozet
   PATCH  /api/admin/reviews/{id}            - yayindan kaldir / one cikar / yanitla
-  GET    /api/admin/stats/opportunity       - firsat saati isi haritasi
+  GET    /api/admin/stats/opportunity       - doluluk isi haritasi (yalniz icgoru)
+  GET/PUT /api/admin/settings/discount      - firsat saati sabit indirim ayarlari (yonetici)
+  GET/PUT /api/admin/settings/deposit       - kapora ayarlari (yonetici)
+  GET    /api/admin/deposits                - kapora bekleyenler + iade bekleyenler (yonetici)
+  POST   /api/admin/appointments/{id}/deposit/paid     - "Kapora odendi" (yonetici)
+  POST   /api/admin/appointments/{id}/deposit/refunded - "Kapora iade edildi" (yonetici)
+  POST   /api/admin/appointments/{id}/deposit/resend   - kapora mesajini tekrar gonder (yonetici)
   GET    /api/admin/portfolio               - galeri yonetimi listesi
-  POST   /api/admin/portfolio               - galeriye is ekle / sil
+  POST   /api/admin/portfolio               - galeriye is ekle
+  PATCH  /api/admin/portfolio/{id}          - is duzenle / gorsel degistir / gizle
+  POST   /api/admin/portfolio/reorder       - siralama
+  DELETE /api/admin/portfolio?id=           - sil
 """
 
 from __future__ import annotations
@@ -39,6 +56,10 @@ from ..config import config
 from ..core.campaigns import parse_target_rule
 from ..core.opportunity import (
     DEFAULT_OPPORTUNITY_CONFIG,
+    DISCOUNT_MAX_RATE,
+    DISCOUNT_MIN_RATE,
+    format_discount_days,
+    parse_discount_days,
     OccupancySample,
     score_opportunity,
     with_global_mean,
@@ -66,13 +87,16 @@ from ..models import (
     Salon,
     ScheduledNotification,
     Service,
+    ServiceCategory,
     SlotLock,
     Staff,
     StockMovement,
     TimeOff,
 )
 from ..services.appointment import move_appointment
-from ..services.appointment_status import change_appointment_status
+from ..services.appointment_status import change_appointment_status, revert_appointment_status
+from ..services import manual_booking, notification_worker
+from ..services.booking_for_other import BeneficiaryBody
 from ..services.catalog import (
     assert_staff_can_do,
     get_default_branch,
@@ -81,7 +105,7 @@ from ..services.catalog import (
 )
 from ..services.campaign_audience import campaign_match_counts
 from ..services.customer_profile import build_customer_profile, list_customer_summaries
-from ..services import messaging, whatsapp_inbound
+from ..services import deposit, messaging, post_visit, rebooking, whatsapp_inbound
 from ..services.notifications import list_notification_queue
 from ..services.portfolio import list_admin_portfolio
 from ..services.reviews import (
@@ -101,7 +125,7 @@ from ..time_utils import (
     weekday_name_tr,
     weekday_of,
 )
-from ..uploads import store_upload
+from ..uploads import delete_stored_file, store_upload
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], route_class=EnvelopeRoute)
 
@@ -191,6 +215,7 @@ def dashboard(staff: StaffDep, db: DbSession, date: str | None = None) -> dict:
                 "startLabel": minutes_to_label(a.start_min),
                 "endLabel": minutes_to_label(a.end_min),
                 "status": a.status,
+                "depositStatus": a.deposit_status,
                 "version": a.version,
                 "isOpportunity": a.is_opportunity,
                 "shadowParentId": a.shadow_parent_id,
@@ -312,6 +337,7 @@ def calendar(staff: StaffDep, db: DbSession, date: str | None = None) -> dict:
                 busy.append({"start": after_start, "end": after_end})
         return busy, passive
 
+    deposit_settings = deposit.load_settings(db)
     appointment_payload = []
     for a in appointments:
         busy, passive = intervals_of(a)
@@ -329,6 +355,14 @@ def calendar(staff: StaffDep, db: DbSession, date: str | None = None) -> dict:
                 "totalPrice": a.total_price,
                 "isOpportunity": a.is_opportunity,
                 "shadowParentId": a.shadow_parent_id,
+                #: Randevuda saglik beyani onaylandi mi? (eski kayitlarda False)
+                "healthDeclared": a.health_declaration_at is not None,
+                "source": a.source,
+                "createdByStaffId": a.created_by_staff_id,
+                "notes": a.notes,
+                "discountRate": a.discount_rate,
+                "groupId": a.booking_group_id,
+                "deposit": deposit.admin_view(a, deposit_settings, now),
                 "customer": {
                     "id": a.customer.id,
                     "firstName": a.customer.first_name,
@@ -346,6 +380,10 @@ def calendar(staff: StaffDep, db: DbSession, date: str | None = None) -> dict:
         )
 
     return {
+        #: Arayuz rol kisitlari icin (yonetici mi? kendi takvimi hangisi?)
+        "viewer": {"id": staff.id, "role": staff.role},
+        #: Panelde "Kapora iste" kutusu yalnizca kapora aciksa gosterilir
+        "depositEnabled": deposit_settings.enabled,
         "date": date,
         "dateLabel": format_date_tr(date),
         "weekday": weekday,
@@ -397,6 +435,8 @@ class MoveBody(BaseModel):
     toStartMin: int = Field(ge=0, le=1439)
     #: Suruklemeye baslarken kartta yazan surum
     expectedVersion: int = Field(ge=0)
+    #: Musteriye "randevunuz guncellendi" mesaji (surukleme icin varsayilan kapali)
+    notifyCustomer: bool = False
 
     @field_validator("toDate")
     @classmethod
@@ -451,7 +491,28 @@ def move(appointment_id: int, body: MoveBody, staff: StaffDep, db: DbSession) ->
         exclusive_resource_ids=get_exclusive_resource_ids(db, branch.id),
     )
 
+    # Randevu oncesi hatirlatma yeni saate tasinir (eskisi bekliyorsa geri cekilir).
+    fresh = db.scalar(
+        select(Appointment)
+        .options(
+            selectinload(Appointment.items).selectinload(AppointmentItem.service),
+            selectinload(Appointment.customer),
+        )
+        .where(Appointment.id == appointment_id)
+    )
+    notice_queued = False
+    if fresh is not None:
+        manual_booking.sync_pre_reminder(
+            db, fresh, fresh.customer, [i.service.name for i in fresh.items if i.service]
+        )
+        if body.notifyCustomer:
+            notice_queued = manual_booking.queue_update_notice(db, fresh)
+        db.commit()
+        if notice_queued:
+            notification_worker.kick()
+
     return {
+        "noticeQueued": notice_queued,
         "id": moved.id,
         "staffId": moved.staff_id,
         "date": moved.date,
@@ -464,9 +525,40 @@ def move(appointment_id: int, body: MoveBody, staff: StaffDep, db: DbSession) ->
     }
 
 
+@router.post("/appointments/{appointment_id}/notify-update")
+def notify_update(appointment_id: int, staff: StaffDep, db: DbSession) -> dict:
+    """Surukle-birak sonrasi "Musteriye bildir": guncel saat icin mesaji kuyruga yazar
+    (randevu + surum basina tek mesaj)."""
+    appt = db.scalar(
+        select(Appointment)
+        .options(
+            selectinload(Appointment.items).selectinload(AppointmentItem.service),
+            selectinload(Appointment.customer),
+        )
+        .where(Appointment.id == appointment_id)
+    )
+    if appt is None:
+        raise AppError("NOT_FOUND", "Randevu bulunamadı.", 404)
+    if appt.status not in ("PENDING", "CONFIRMED"):
+        raise AppError("VALIDATION", "Yalnızca aktif randevu için bildirim gönderilir.", 409)
+    queued = manual_booking.queue_update_notice(db, appt)
+    db.commit()
+    if queued:
+        notification_worker.kick()
+    return {"queued": queued}
+
+
 class StatusBody(BaseModel):
     status: str
     expectedVersion: int = Field(ge=0)
+    #: Iptalde musteriye WhatsApp iptal mesaji gitsin mi?
+    notifyCustomer: bool = True
+    #: Kapora bekleyen randevuyu iptal ederken neden: "DEPOSIT_UNPAID" ->
+    #: "kapora yatirilmadigi icin iptal" mesaji (genel iptal mesajinin yerine).
+    reason: str | None = None
+    #: Odenmis kaporali randevu iptalinde kapora iade EDILMEZ ("kapora yanar");
+    #: yalnizca yonetici.
+    depositForfeit: bool = False
 
     @field_validator("status")
     @classmethod
@@ -484,13 +576,240 @@ def set_status(appointment_id: int, body: StatusBody, staff: StaffDep, db: DbSes
     transaction'da uygulanir: stok dusumu (idempotent), sadakat puani,
     risk olayi, tekrar hatirlatmasi ve iptal halinde slotun serbest
     birakilmasi.
+
+    Kapora: kapora beklenirken (AWAITING) onaylamak/tamamlamak (kapora
+    feragat) ve "kapora yanar" iptali yalnizca yoneticidir.
     """
+    if body.reason not in (None, "DEPOSIT_UNPAID"):
+        raise AppError("VALIDATION", "Geçersiz iptal nedeni.", 400)
+    is_manager = manual_booking.is_manager(staff)
+    if body.depositForfeit and not is_manager:
+        raise AppError("FORBIDDEN", "Kaporayı yakmak yalnızca yönetici yetkisindedir.", 403)
+    if body.status in ("CONFIRMED", "COMPLETED") and not is_manager:
+        awaiting = db.scalar(
+            select(Appointment.id).where(
+                Appointment.id == appointment_id,
+                Appointment.deposit_status == deposit.AWAITING,
+            )
+        )
+        if awaiting:
+            raise AppError(
+                "FORBIDDEN",
+                "Kapora bekleniyor; randevuyu yalnızca yönetici “Kapora ödendi” ile onaylayabilir.",
+                403,
+            )
     return change_appointment_status(
         db,
         appointment_id=appointment_id,
         status=body.status,
         expected_version=body.expectedVersion,
+        notify=body.notifyCustomer,
+        cancel_reason=body.reason,
+        deposit_forfeit=body.depositForfeit,
     )
+
+
+class RevertBody(BaseModel):
+    expectedVersion: int = Field(ge=0)
+    #: Slot baskasina verilmis olsa da geri al
+    force: bool = False
+
+
+@router.post("/appointments/{appointment_id}/revert")
+def revert_status(
+    appointment_id: int, body: RevertBody, manager: ManagerDep, db: DbSession
+) -> dict:
+    """Tamamlandi / Gelmedi / Iptal durumunu geri alir (yonetici).
+
+    Yan etkiler ``revert_appointment_status`` icinde tersine cevrilir."""
+    return revert_appointment_status(
+        db,
+        appointment_id=appointment_id,
+        expected_version=body.expectedVersion,
+        force=body.force,
+    )
+
+
+# ---------------------------------------------------------------------
+# Panelden elle randevu: olustur / duzenle / onizle
+# ---------------------------------------------------------------------
+
+
+def _check_date(v: str) -> str:
+    if not is_date_key(v):
+        raise ValueError('Tarih "YYYY-MM-DD" biçiminde olmalı.')
+    return v
+
+
+class ManualCreateBody(BaseModel):
+    customerId: int | None = Field(default=None, gt=0)
+    #: Yeni musteri: ad + ZORUNLU telefon (telefonsuz kayit desteklenmez:
+    #: ``customer.phone`` zorunlu + benzersiz; bildirim ve risk havuzu ona baglidir).
+    newCustomer: BeneficiaryBody | None = None
+    staffId: int = Field(gt=0)
+    date: str
+    startMin: int = Field(ge=0, le=1439)
+    #: Tekrarlara izin verilir (ayni hizmet iki kez)
+    serviceIds: list[int] = Field(min_length=1)
+    status: str = "CONFIRMED"
+    #: Salonun sabit firsat saati indirimi uygulansin mi?
+    applyDiscount: bool = True
+    #: Elle fiyat (verilirse indirim uygulanmaz)
+    priceOverride: float | None = Field(default=None, ge=0, le=1_000_000)
+    notes: str | None = Field(default=None, max_length=500)
+    sendWhatsapp: bool = True
+    #: Cakismaya ragmen ekle (yalnizca yonetici)
+    force: bool = False
+    #: "Kapora iste": PENDING + kapora bekleniyor (yalnizca kapora aciksa)
+    requestDeposit: bool = False
+
+    @field_validator("date")
+    @classmethod
+    def _valid_date(cls, v: str) -> str:
+        return _check_date(v)
+
+
+@router.post("/appointments")
+def create_manual_appointment(body: ManualCreateBody, staff: StaffDep, db: DbSession) -> dict:
+    """Panelden randevu ekler. Musteri: ``customerId`` (mevcut) YA DA ``newCustomer``
+    (ad + telefon; telefon kayitliysa o musteri kullanilir).
+
+    409 ``SLOT_CONFLICT`` -> ``details.conflicts`` nedenleri; ``details.canForce``
+    yoneticiye ``force: true`` ile yeniden denemeyi sunar."""
+    if (body.customerId is None) == (body.newCustomer is None):
+        raise AppError("VALIDATION", "Mevcut müşteriyi seçin ya da yeni müşteri bilgisi girin.", 400)
+    return manual_booking.create_manual_appointment(
+        db,
+        creator=staff,
+        customer_id=body.customerId,
+        new_customer=body.newCustomer,
+        staff_id=body.staffId,
+        date=body.date,
+        start_min=body.startMin,
+        service_ids=body.serviceIds,
+        status=body.status,
+        apply_discount=body.applyDiscount,
+        price_override=body.priceOverride,
+        notes=body.notes,
+        send_whatsapp=body.sendWhatsapp,
+        force=body.force,
+        request_deposit=body.requestDeposit,
+    )
+
+
+class ManualUpdateBody(BaseModel):
+    expectedVersion: int = Field(ge=0)
+    serviceIds: list[int] | None = Field(default=None, min_length=1)
+    staffId: int | None = Field(default=None, gt=0)
+    date: str | None = None
+    startMin: int | None = Field(default=None, ge=0, le=1439)
+    customerId: int | None = Field(default=None, gt=0)
+    newCustomer: BeneficiaryBody | None = None
+    #: Gonderilmezse fiyat yalnizca hizmet/usta/saat degisirse yeniden hesaplanir;
+    #: sayi = elle fiyat; null = otomatik hesapla.
+    priceOverride: float | None = Field(default=None, ge=0, le=1_000_000)
+    applyDiscount: bool = True
+    notes: str | None = Field(default=None, max_length=500)
+    force: bool = False
+    #: "Randevunuz guncellendi" WhatsApp mesaji
+    notifyCustomer: bool = False
+
+    @field_validator("date")
+    @classmethod
+    def _valid_date(cls, v: str | None) -> str | None:
+        return _check_date(v) if v is not None else v
+
+
+@router.patch("/appointments/{appointment_id}")
+def update_manual_appointment(
+    appointment_id: int, body: ManualUpdateBody, staff: StaffDep, db: DbSession
+) -> dict:
+    """Randevuyu duzenler (yalnizca PENDING/CONFIRMED). Hucreler, kalemler ve
+    kaynaklar ayni transaction'da yeniden yazilir; cakisma kurallari olusturma ile ayni."""
+    sent = body.model_fields_set
+    return manual_booking.update_manual_appointment(
+        db,
+        editor=staff,
+        appointment_id=appointment_id,
+        expected_version=body.expectedVersion,
+        service_ids=body.serviceIds,
+        staff_id=body.staffId,
+        date=body.date,
+        start_min=body.startMin,
+        customer_id=body.customerId,
+        new_customer=body.newCustomer,
+        notes=body.notes if "notes" in sent else manual_booking._UNSET,
+        price_override=body.priceOverride if "priceOverride" in sent else manual_booking._UNSET,
+        apply_discount=body.applyDiscount,
+        force=body.force,
+        notify_customer=body.notifyCustomer,
+    )
+
+
+class PreviewBody(BaseModel):
+    serviceIds: list[int] = Field(min_length=1)
+    staffId: int = Field(gt=0)
+    date: str
+    startMin: int = Field(ge=0, le=1439)
+    customerId: int | None = Field(default=None, gt=0)
+    #: Duzenlemede kendi hucreleri cakisma sayilmasin
+    excludeAppointmentId: int | None = Field(default=None, gt=0)
+    applyDiscount: bool = True
+
+    @field_validator("date")
+    @classmethod
+    def _valid_date(cls, v: str) -> str:
+        return _check_date(v)
+
+
+@router.post("/appointments/preview")
+def preview_appointment(body: PreviewBody, staff: StaffDep, db: DbSession) -> dict:
+    """Form onizlemesi: sure, fiyat (indirimli) ve cakisma nedenleri. Hicbir sey yazmaz."""
+    return manual_booking.preview(
+        db,
+        principal=staff,
+        service_ids=body.serviceIds,
+        staff_id=body.staffId,
+        date=body.date,
+        start_min=body.startMin,
+        customer_id=body.customerId,
+        exclude_appointment_id=body.excludeAppointmentId,
+        apply_discount=body.applyDiscount,
+    )
+
+
+def _service_row(s: Service) -> dict:
+    return {
+        "id": s.id,
+        "name": s.name,
+        "price": s.price,
+        "durationMin": s.active_before_min + s.passive_min + s.active_after_min + s.buffer_min,
+    }
+
+
+@router.get("/service-options")
+def service_options(staff: StaffDep, db: DbSession) -> dict:
+    """Randevu formu: kategorilere gore aktif hizmetler (nominal sure/fiyat)."""
+    branch = get_default_branch(db)
+    categories = db.scalars(
+        select(ServiceCategory)
+        .where(ServiceCategory.branch_id == branch.id)
+        .order_by(ServiceCategory.sort_order, ServiceCategory.id)
+    ).all()
+    services = db.scalars(
+        select(Service)
+        .where(Service.branch_id == branch.id, Service.is_active.is_(True))
+        .order_by(Service.name)
+    ).all()
+    groups = []
+    for c in categories:
+        rows = [s for s in services if s.category_id == c.id]
+        if rows:
+            groups.append({"id": c.id, "name": c.name, "services": [_service_row(s) for s in rows]})
+    loose = [s for s in services if s.category_id is None]
+    if loose:
+        groups.append({"id": 0, "name": "Diğer", "services": [_service_row(s) for s in loose]})
+    return {"categories": groups}
 
 
 # ---------------------------------------------------------------------
@@ -501,6 +820,29 @@ def set_status(appointment_id: int, body: StatusBody, staff: StaffDep, db: DbSes
 def _lower_tr(text: str) -> str:
     """Turkce kucuk harf (``toLocaleLowerCase('tr')`` karsiligi): I -> ı, İ -> i."""
     return text.replace("I", "ı").replace("İ", "i").lower()
+
+
+@router.get("/customers/search")
+def search_customers(staff: StaffDep, db: DbSession, q: str = "") -> dict:
+    """Randevu formu icin hafif arama (ad / soyad / telefon; ilk 15)."""
+    needle = _lower_tr(q.strip())
+    if len(needle) < 2:
+        return {"customers": []}
+    digits = "".join(ch for ch in needle if ch.isdigit())
+    rows = db.execute(
+        select(Customer.id, Customer.first_name, Customer.last_name, Customer.phone).where(
+            Customer.anonymized_at.is_(None)
+        )
+    ).all()
+    out = []
+    for r in rows:
+        name = _lower_tr(f"{r.first_name} {r.last_name or ''}")
+        if needle in name or (len(digits) >= 3 and digits in r.phone):
+            out.append(
+                {"id": r.id, "firstName": r.first_name, "lastName": r.last_name, "phone": r.phone}
+            )
+    out.sort(key=lambda c: (_lower_tr(c["firstName"]), _lower_tr(c["lastName"] or "")))
+    return {"customers": out[:15]}
 
 
 @router.get("/customers")
@@ -635,6 +977,7 @@ def customer_detail(customer_id: int, staff: StaffDep, db: DbSession) -> dict:
                 "dateLabel": format_date_tr(a.date),
                 "startLabel": minutes_to_label(a.start_min),
                 "status": a.status,
+                "depositStatus": a.deposit_status,
                 "totalPrice": a.total_price,
                 "staffName": a.staff.name,
                 "services": [i.service.name for i in a.items],
@@ -1284,6 +1627,215 @@ def put_welcome(body: WelcomeBody, manager: ManagerDep, db: DbSession) -> dict:
     return _welcome_payload(salon)
 
 
+# ---------------------------------------------------------------------
+# Ziyaret sonrasi mesaj (tesekkur + puanlama + Google/Instagram)
+# ---------------------------------------------------------------------
+
+
+def _post_visit_payload(salon: Salon) -> dict:
+    return {
+        "enabled": salon.post_visit_enabled,
+        "delayHours": salon.post_visit_delay_hours,
+        #: Kaydedilmis ozel metin; null ise varsayilan kullaniliyor.
+        "message": salon.post_visit_message,
+        "defaultMessage": post_visit.DEFAULT_POST_VISIT,
+        "placeholders": post_visit.PLACEHOLDERS,
+        "maxLength": post_visit.MAX_MESSAGE_LENGTH,
+        "maxDelayHours": post_visit.MAX_DELAY_HOURS,
+        "googleReviewUrl": salon.google_review_url or "",
+        "instagramUrl": salon.instagram_url or "",
+        #: Ornek verilerle doldurulmus hali - musteriye giden metin.
+        "preview": post_visit.render_post_visit(salon),
+    }
+
+
+@router.get("/messaging/post-visit")
+def get_post_visit(manager: ManagerDep, db: DbSession) -> dict:
+    return _post_visit_payload(_salon(db))
+
+
+class PostVisitBody(BaseModel):
+    enabled: bool
+    delayHours: int = Field(ge=0, le=post_visit.MAX_DELAY_HOURS)
+    #: Bos/null -> varsayilan metne don.
+    message: str | None = Field(default=None, max_length=post_visit.MAX_MESSAGE_LENGTH)
+    #: Bos metin = bu baglanti mesajdan cikarilir.
+    googleReviewUrl: str = Field(default="", max_length=300)
+    instagramUrl: str = Field(default="", max_length=300)
+
+    @field_validator("googleReviewUrl", "instagramUrl")
+    @classmethod
+    def _valid_url(cls, v: str) -> str:
+        v = v.strip()
+        if v and not (v.startswith("https://") or v.startswith("http://")):
+            raise ValueError("Bağlantı http:// veya https:// ile başlamalı.")
+        return v
+
+
+@router.put("/messaging/post-visit")
+def put_post_visit(body: PostVisitBody, manager: ManagerDep, db: DbSession) -> dict:
+    salon = _salon(db)
+    message = (body.message or "").strip()
+    salon.post_visit_enabled = body.enabled
+    salon.post_visit_delay_hours = body.delayHours
+    salon.post_visit_message = (
+        message if message and message != post_visit.DEFAULT_POST_VISIT else None
+    )
+    salon.google_review_url = body.googleReviewUrl
+    salon.instagram_url = body.instagramUrl
+    db.commit()
+    return _post_visit_payload(salon)
+
+
+# ---------------------------------------------------------------------
+# Yenileme (tekrar randevu) davetleri - hizmet bazli basit gorunum
+# ---------------------------------------------------------------------
+
+
+def _rebooking_rule_payload(r: ReminderRule) -> dict:
+    return {
+        "id": r.id,
+        "isActive": r.is_active,
+        "baseDays": r.base_days,
+        "formula": r.formula,
+        #: FIXED degilse panel sureyi salt-okunur gosterir.
+        "advanced": r.formula != "FIXED",
+        "template": r.template,
+    }
+
+
+def _rebooking_payload(db: DbSession) -> dict:
+    branch = get_default_branch(db)
+    categories = db.scalars(
+        select(ServiceCategory)
+        .where(ServiceCategory.branch_id == branch.id)
+        .order_by(ServiceCategory.sort_order, ServiceCategory.id)
+    ).all()
+    services = db.scalars(
+        select(Service)
+        .where(Service.branch_id == branch.id, Service.is_active.is_(True))
+        .order_by(Service.name)
+    ).all()
+    rules = db.scalars(select(ReminderRule).where(ReminderRule.branch_id == branch.id)).all()
+
+    own: dict[int, ReminderRule] = {}
+    for r in sorted(rules, key=lambda r: (r.is_active, r.priority, r.id)):
+        if r.service_id is not None:
+            own[r.service_id] = r  # aktif + yuksek oncelikli sona kalir
+    by_category = {
+        r.category_id: r
+        for r in rules
+        if r.is_active and r.service_id is None and r.category_id is not None
+    }
+    generic = next(
+        (r for r in rules if r.is_active and r.service_id is None and r.category_id is None),
+        None,
+    )
+
+    def service_row(svc: Service) -> dict:
+        rule = own.get(svc.id)
+        inherited = None
+        if rule is None:
+            fallback = by_category.get(svc.category_id) or generic
+            inherited = fallback.name if fallback else None
+        return {
+            "id": svc.id,
+            "name": svc.name,
+            "rule": _rebooking_rule_payload(rule) if rule else None,
+            #: Hizmete ozel kural yok ama kategori/genel kural bu hizmeti kapsiyor.
+            "inheritedRuleName": inherited,
+        }
+
+    groups = [
+        {
+            "category": {"id": c.id, "name": c.name},
+            "services": [service_row(s) for s in services if s.category_id == c.id],
+        }
+        for c in categories
+    ]
+    uncategorized = [service_row(s) for s in services if s.category_id is None]
+    if uncategorized:
+        groups.append({"category": {"id": None, "name": "Diğer"}, "services": uncategorized})
+
+    consent_count = db.scalar(
+        select(func.count())
+        .select_from(Customer)
+        .where(Customer.marketing_consent_at.is_not(None), Customer.anonymized_at.is_(None))
+    )
+    return {
+        "groups": [g for g in groups if g["services"]],
+        "defaultTemplate": rebooking.DEFAULT_TEMPLATE,
+        "placeholders": rebooking.PLACEHOLDERS,
+        "optOutLine": rebooking.OPT_OUT_LINE,
+        "maxTemplateLength": 500,
+        "marketingConsentCount": consent_count or 0,
+    }
+
+
+@router.get("/rebooking")
+def get_rebooking(manager: ManagerDep, db: DbSession) -> dict:
+    return _rebooking_payload(db)
+
+
+class RebookingBody(BaseModel):
+    serviceId: int = Field(gt=0)
+    enabled: bool
+    #: Gun cinsinden (arayuz hafta/ay'i gune cevirir).
+    baseDays: int | None = Field(default=None, ge=1, le=400)
+    #: Bos/null -> varsayilan metin.
+    template: str | None = Field(default=None, max_length=500)
+    #: Gelismis (FIXED olmayan) kurali basit sabit araliga cevir.
+    switchToSimple: bool = False
+
+
+@router.put("/rebooking")
+def put_rebooking(body: RebookingBody, manager: ManagerDep, db: DbSession) -> dict:
+    branch = get_default_branch(db)
+    service = db.get(Service, body.serviceId)
+    if service is None or service.branch_id != branch.id:
+        raise AppError("NOT_FOUND", "Hizmet bulunamadı.", 404)
+
+    rule = db.scalar(
+        select(ReminderRule)
+        .where(ReminderRule.branch_id == branch.id, ReminderRule.service_id == service.id)
+        .order_by(ReminderRule.is_active.desc(), ReminderRule.priority.desc(), ReminderRule.id)
+        .limit(1)
+    )
+    template = (body.template or "").strip() or rebooking.DEFAULT_TEMPLATE
+
+    if rule is None:
+        if not body.enabled:
+            return _rebooking_payload(db)
+        if body.baseDays is None:
+            raise AppError("VALIDATION", "Kaç gün sonra hatırlatılacağını girin.", 400)
+        db.add(
+            ReminderRule(
+                branch_id=branch.id,
+                name=f"{service.name} yenileme",
+                service_id=service.id,
+                formula="FIXED",
+                base_days=body.baseDays,
+                params="{}",
+                channel="WHATSAPP",
+                template=template,
+                priority=50,
+                is_active=True,
+            )
+        )
+    else:
+        rule.is_active = body.enabled
+        rule.template = template
+        if rule.formula != "FIXED" and body.switchToSimple:
+            if body.baseDays is None:
+                raise AppError("VALIDATION", "Kaç gün sonra hatırlatılacağını girin.", 400)
+            rule.formula = "FIXED"
+            rule.params = "{}"
+        if rule.formula == "FIXED" and body.baseDays is not None:
+            rule.base_days = body.baseDays
+    db.commit()
+    return _rebooking_payload(db)
+
+
 class ReminderRuleBody(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     serviceId: int | None = None
@@ -1508,9 +2060,214 @@ def opportunity_stats(staff: StaffDep, db: DbSession) -> dict:
     }
 
 
+DISCOUNT_CUTOFF_CHOICES = (600, 660, 720, 780)  # 10:00 / 11:00 / 12:00 / 13:00
+_DAY_NAMES_TR = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"]
+
+
+def _discount_payload(salon: Salon) -> dict:
+    days = list(parse_discount_days(salon.discount_days))
+    rate_pct = round(salon.discount_rate * 100)
+    cutoff = minutes_to_label(salon.discount_cutoff_min)
+    if not salon.discount_enabled:
+        summary = "Fırsat saati indirimi kapalı."
+    elif not days:
+        summary = "Fırsat saati indirimi için gün seçilmedi."
+    else:
+        if days == [1, 2, 3, 4, 5]:
+            day_text = "Hafta içi"
+        else:
+            day_text = ", ".join(_DAY_NAMES_TR[d] for d in days)
+        summary = f"{day_text} {cutoff}'den önce başlayan randevulara %{rate_pct} indirim"
+    return {
+        "enabled": salon.discount_enabled,
+        "rate": salon.discount_rate,
+        "cutoffMin": salon.discount_cutoff_min,
+        "cutoffLabel": cutoff,
+        "days": days,
+        "dayNames": _DAY_NAMES_TR,
+        "cutoffChoices": list(DISCOUNT_CUTOFF_CHOICES),
+        "minRate": DISCOUNT_MIN_RATE,
+        "maxRate": DISCOUNT_MAX_RATE,
+        "summary": summary,
+    }
+
+
+@router.get("/settings/discount")
+def get_discount(manager: ManagerDep, db: DbSession) -> dict:
+    return _discount_payload(_salon(db))
+
+
+class DiscountBody(BaseModel):
+    enabled: bool
+    rate: float = Field(ge=DISCOUNT_MIN_RATE, le=DISCOUNT_MAX_RATE)
+    cutoffMin: int
+    days: list[int] = Field(max_length=7)
+
+    @field_validator("rate")
+    @classmethod
+    def _step(cls, v: float) -> float:
+        if abs(v * 20 - round(v * 20)) > 1e-6:
+            raise ValueError("İndirim oranı %5'in katı olmalı.")
+        return round(v, 2)
+
+    @field_validator("cutoffMin")
+    @classmethod
+    def _cutoff(cls, v: int) -> int:
+        if v not in DISCOUNT_CUTOFF_CHOICES:
+            raise ValueError("Geçersiz saat.")
+        return v
+
+    @field_validator("days")
+    @classmethod
+    def _days(cls, v: list[int]) -> list[int]:
+        if any(not isinstance(d, int) or d < 0 or d > 6 for d in v):
+            raise ValueError("Geçersiz gün.")
+        return sorted(set(v))
+
+
+@router.put("/settings/discount")
+def put_discount(body: DiscountBody, manager: ManagerDep, db: DbSession) -> dict:
+    salon = _salon(db)
+    salon.discount_enabled = body.enabled
+    salon.discount_rate = body.rate
+    salon.discount_cutoff_min = body.cutoffMin
+    salon.discount_days = format_discount_days(body.days)
+    db.commit()
+    return _discount_payload(salon)
+
+
 # ---------------------------------------------------------------------
 # Portfolyo
 # ---------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------
+# Kapora (deposit): ayarlar, listeler, odendi / iade edildi
+# ---------------------------------------------------------------------
+
+
+def _deposit_payload(salon: Salon) -> dict:
+    settings = deposit.settings_of(salon)
+    return {
+        "enabled": settings.enabled,
+        "percent": settings.percent,
+        "minAmount": settings.min_amount,
+        "iban": deposit.format_iban(settings.iban),
+        "accountName": settings.account_name,
+        "bankName": settings.bank_name,
+        "deadlineMinutes": settings.deadline_minutes,
+        #: Kaydedilmis ozel metin; null ise varsayilan kullaniliyor.
+        "message": settings.message,
+        "defaultMessage": deposit.DEFAULT_TEMPLATE,
+        "placeholders": deposit.PLACEHOLDERS,
+        "maxLength": deposit.MAX_MESSAGE_LENGTH,
+        "policy": deposit.POLICY_TEXT,
+        "preview": deposit.render_preview(settings),
+    }
+
+
+@router.get("/settings/deposit")
+def get_deposit_settings(manager: ManagerDep, db: DbSession) -> dict:
+    return _deposit_payload(_salon(db))
+
+
+class DepositBody(BaseModel):
+    enabled: bool
+    percent: int = Field(ge=1, le=100)
+    minAmount: int = Field(ge=0, le=100_000)
+    iban: str = Field(default="", max_length=60)
+    accountName: str = Field(default="", max_length=120)
+    bankName: str = Field(default="", max_length=80)
+    deadlineMinutes: int = Field(ge=5, le=1440)
+    #: Bos/null -> varsayilan metne don.
+    message: str | None = Field(default=None, max_length=deposit.MAX_MESSAGE_LENGTH)
+
+
+@router.put("/settings/deposit")
+def put_deposit_settings(body: DepositBody, manager: ManagerDep, db: DbSession) -> dict:
+    iban = ""
+    if body.iban.strip():
+        try:
+            iban = deposit.validate_iban(body.iban)
+        except ValueError as error:
+            raise AppError("VALIDATION", str(error), 400, {"field": "iban"}) from error
+    account = " ".join(body.accountName.split())
+    if body.enabled:
+        if not iban:
+            raise AppError("VALIDATION", "Kaporayı açmak için geçerli bir IBAN girin.", 400, {"field": "iban"})
+        if not account:
+            raise AppError(
+                "VALIDATION", "Kaporayı açmak için hesap sahibinin adını girin.", 400, {"field": "accountName"}
+            )
+    salon = _salon(db)
+    message = (body.message or "").strip()
+    salon.deposit_enabled = body.enabled
+    salon.deposit_percent = body.percent
+    salon.deposit_min_amount = body.minAmount
+    salon.deposit_iban = iban
+    salon.deposit_account_name = account
+    salon.deposit_bank_name = " ".join(body.bankName.split())
+    salon.deposit_deadline_minutes = body.deadlineMinutes
+    salon.deposit_message = message if message and message != deposit.DEFAULT_TEMPLATE else None
+    db.commit()
+    return _deposit_payload(salon)
+
+
+@router.get("/deposits")
+def deposit_lists(manager: ManagerDep, db: DbSession) -> dict:
+    """Kapora bekleyenler (eskiden yeniye) + iade bekleyenler (suresi en yakin once)."""
+    now = now_local()
+    settings = deposit.load_settings(db)
+    return {
+        "enabled": settings.enabled,
+        "deadlineMinutes": settings.deadline_minutes,
+        "awaiting": deposit.list_awaiting(db, now),
+        "refunds": deposit.list_refunds(db, now),
+    }
+
+
+class DepositActionBody(BaseModel):
+    expectedVersion: int | None = Field(default=None, ge=0)
+    #: Iade edildi: musteriye "Kaporaniz iade edilmistir" mesaji gitsin mi?
+    notifyCustomer: bool = True
+
+
+@router.post("/appointments/{appointment_id}/deposit/paid")
+def deposit_paid(
+    appointment_id: int, body: DepositActionBody, manager: ManagerDep, db: DbSession
+) -> dict:
+    """"Kapora odendi": PENDING -> CONFIRMED, kapora PAID, musteriye mesaj."""
+    result = deposit.mark_paid(
+        db, appointment_id, manager.id, expected_version=body.expectedVersion
+    )
+    if result["whatsappQueued"]:
+        notification_worker.kick()
+    return result
+
+
+@router.post("/appointments/{appointment_id}/deposit/refunded")
+def deposit_refunded(
+    appointment_id: int, body: DepositActionBody, manager: ManagerDep, db: DbSession
+) -> dict:
+    """"Kapora iade edildi" (salon parayi elle gonderdi; sistem yalnizca isaretler)."""
+    result = deposit.mark_refunded(
+        db,
+        appointment_id,
+        manager.id,
+        notify=body.notifyCustomer,
+        expected_version=body.expectedVersion,
+    )
+    if result["whatsappQueued"]:
+        notification_worker.kick()
+    return result
+
+
+@router.post("/appointments/{appointment_id}/deposit/resend")
+def deposit_resend(appointment_id: int, manager: ManagerDep, db: DbSession) -> dict:
+    """Kapora mesajini tekrar gonder (orn. fiyat degisti)."""
+    result = deposit.resend_request(db, appointment_id)
+    notification_worker.kick()
+    return result
 
 
 @router.get("/portfolio")
@@ -1538,6 +2295,7 @@ async def add_portfolio(
     branch = get_default_branch(db)
     if not title.strip():
         raise AppError("VALIDATION", "Başlık gerekli.", 400)
+    _check_portfolio_refs(db, branch.id, categoryId, staffId)
 
     stored = await store_upload(file, "portfolyo")
 
@@ -1554,15 +2312,155 @@ async def add_portfolio(
     return {"item": {"id": item.id, "title": item.title, "imageUrl": item.image_url}}
 
 
+def _check_portfolio_refs(
+    db: DbSession, branch_id: int, category_id: int | None, staff_id: int | None
+) -> None:
+    if category_id is not None and not db.scalar(
+        select(ServiceCategory.id).where(
+            ServiceCategory.id == category_id, ServiceCategory.branch_id == branch_id
+        )
+    ):
+        raise AppError("VALIDATION", "Seçilen kategori bulunamadı.", 400)
+    if staff_id is not None and not db.scalar(
+        select(Staff.id).where(Staff.id == staff_id, Staff.branch_id == branch_id)
+    ):
+        raise AppError("VALIDATION", "Seçilen personel bulunamadı.", 400)
+
+
+def _optional_int_form(raw: str | None, label: str) -> tuple[bool, int | None]:
+    """(verildi_mi, deger). Bos string = alani temizle (None)."""
+    if raw is None:
+        return False, None
+    raw = raw.strip()
+    if raw == "":
+        return True, None
+    try:
+        return True, int(raw)
+    except ValueError:
+        raise AppError("VALIDATION", f"{label} geçersiz.", 400) from None
+
+
+def _optional_bool_form(raw: str | None) -> bool | None:
+    if raw is None:
+        return None
+    value = raw.strip().lower()
+    if value in ("true", "1", "on", "yes"):
+        return True
+    if value in ("false", "0", "off", "no"):
+        return False
+    raise AppError("VALIDATION", "Yayın durumu geçersiz.", 400)
+
+
+class PortfolioReorderBody(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=500)
+
+
+@router.post("/portfolio/reorder")
+def reorder_portfolio(staff: StaffDep, db: DbSession, body: PortfolioReorderBody) -> dict:
+    """Verilen id sirasini ``sort_order`` olarak yazar (0, 1, 2, ...).
+
+    Listede olmayan isler (ornegin baska sekmede eklenenler) listenin
+    ardina, mevcut sirayla eklenir.
+    """
+    branch = get_default_branch(db)
+    if len(set(body.ids)) != len(body.ids):
+        raise AppError("VALIDATION", "Sıralama listesinde tekrar eden kayıt var.", 400)
+
+    rows = db.scalars(
+        select(PortfolioItem)
+        .where(PortfolioItem.branch_id == branch.id)
+        .order_by(PortfolioItem.sort_order, PortfolioItem.id.desc())
+    ).all()
+    by_id = {r.id: r for r in rows}
+    if any(i not in by_id for i in body.ids):
+        raise AppError("NOT_FOUND", "Sıralanacak iş bulunamadı.", 404)
+
+    ordered = [by_id[i] for i in body.ids] + [r for r in rows if r.id not in set(body.ids)]
+    for position, row in enumerate(ordered):
+        row.sort_order = position
+    db.commit()
+    return {"ids": [r.id for r in ordered]}
+
+
+@router.patch("/portfolio/{item_id}")
+async def update_portfolio(
+    item_id: int,
+    staff: StaffDep,
+    db: DbSession,
+    file: UploadFile | None = File(default=None),
+    title: str | None = Form(default=None),
+    description: str | None = Form(default=None),
+    categoryId: str | None = Form(default=None),
+    staffId: str | None = Form(default=None),
+    isPublished: str | None = Form(default=None),
+) -> dict:
+    """Is bilgisini gunceller (multipart). Gonderilmeyen alan degismez.
+
+    ``categoryId`` / ``staffId`` / ``description`` bos string ise alan
+    temizlenir. ``file`` verilirse gorsel degistirilir, eski dosya silinir.
+    """
+    branch = get_default_branch(db)
+    item = db.scalar(
+        select(PortfolioItem).where(
+            PortfolioItem.id == item_id, PortfolioItem.branch_id == branch.id
+        )
+    )
+    if item is None:
+        raise AppError("NOT_FOUND", "İş bulunamadı.", 404)
+
+    if title is not None:
+        if not title.strip():
+            raise AppError("VALIDATION", "Başlık gerekli.", 400)
+        if len(title.strip()) > 160:
+            raise AppError("VALIDATION", "Başlık en fazla 160 karakter olabilir.", 400)
+    cat_given, cat_id = _optional_int_form(categoryId, "Kategori")
+    staff_given, staff_id = _optional_int_form(staffId, "Personel")
+    published = _optional_bool_form(isPublished)
+    _check_portfolio_refs(db, branch.id, cat_id, staff_id)
+
+    old_url: str | None = None
+    if file is not None and getattr(file, "filename", None):
+        stored = await store_upload(file, "portfolyo")
+        old_url = item.image_url
+        item.image_url = stored.url
+
+    if title is not None:
+        item.title = title.strip()
+    if description is not None:
+        item.description = description.strip() or None
+    if cat_given:
+        item.category_id = cat_id
+    if staff_given:
+        item.staff_id = staff_id
+    if published is not None:
+        item.is_published = published
+    db.commit()
+
+    if old_url:
+        delete_stored_file(old_url)
+    return {
+        "item": {
+            "id": item.id,
+            "title": item.title,
+            "imageUrl": item.image_url,
+            "description": item.description,
+            "isPublished": item.is_published,
+            "categoryId": item.category_id,
+            "staffId": item.staff_id,
+        }
+    }
+
+
 @router.delete("/portfolio")
 def delete_portfolio(staff: StaffDep, db: DbSession, id: int = Query(gt=0)) -> dict:
-    from sqlalchemy import delete as sa_delete
-
     branch = get_default_branch(db)
-    count = db.execute(
-        sa_delete(PortfolioItem).where(
-            PortfolioItem.id == id, PortfolioItem.branch_id == branch.id
-        )
-    ).rowcount
+    item = db.scalar(
+        select(PortfolioItem).where(PortfolioItem.id == id, PortfolioItem.branch_id == branch.id)
+    )
+    if item is None:
+        return {"deleted": 0}
+    url = item.image_url
+    db.delete(item)
     db.commit()
-    return {"deleted": count or 0}
+    delete_stored_file(url)
+    return {"deleted": 1}

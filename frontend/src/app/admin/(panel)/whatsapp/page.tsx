@@ -1,5 +1,7 @@
 import { adminApi } from '@/lib/admin-api';
 import type { MeResponse } from '@/lib/server-api';
+import { DepositSettings, type DepositSettingsData } from './deposit-settings';
+import { PostVisitSettings, type PostVisitSettingsData } from './post-visit-settings';
 import { WelcomeSettings, type WelcomeSettingsData } from './welcome-settings';
 import { WhatsappConnect, type MessagingStatus } from './whatsapp-connect';
 
@@ -28,9 +30,11 @@ export default async function WhatsappPage() {
     );
   }
 
-  const [status, welcome] = await Promise.all([
+  const [status, welcome, postVisit, depositSettings] = await Promise.all([
     adminApi<MessagingStatus>('/api/admin/messaging/status'),
     adminApi<WelcomeSettingsData>('/api/admin/messaging/welcome'),
+    adminApi<PostVisitSettingsData>('/api/admin/messaging/post-visit'),
+    adminApi<DepositSettingsData>('/api/admin/settings/deposit'),
   ]);
 
   return (
@@ -42,25 +46,8 @@ export default async function WhatsappPage() {
       <WhatsappConnect initialStatus={status} canManage={role === 'OWNER'} />
 
       {status.driver === 'evolution' && <WelcomeSettings initial={welcome} />}
-
-      <section className="card space-y-2 !p-4 text-sm">
-        <h2 className="eyebrow">Dikkat edilmesi gerekenler</h2>
-        <ul className="list-disc space-y-1 pl-5 text-xs text-ink-700">
-          <li>
-            Salonun ana numarasını değil, <strong>ayrı bir numara</strong> kullanın. QR ile bağlantı
-            resmi bir entegrasyon değildir; WhatsApp numarayı kısıtlayabilir.
-          </li>
-          <li>
-            Bu numaradan yalnızca doğrulama kodu ve randevu hatırlatması gönderilir; toplu kampanya
-            mesajı gönderilmez.
-          </li>
-          <li>
-            Telefon uzun süre internetsiz kalırsa veya &quot;Bağlı cihazlar&quot; listesinden
-            kaldırılırsa bağlantı düşer. Durum &quot;Bağlı&quot; değilse müşteriler giriş kodu
-            alamaz; QR kodunu yeniden okutun.
-          </li>
-        </ul>
-      </section>
+      {status.driver === 'evolution' && <PostVisitSettings initial={postVisit} />}
+      <DepositSettings initial={depositSettings} />
     </div>
   );
 }

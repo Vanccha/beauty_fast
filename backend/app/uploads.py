@@ -89,6 +89,26 @@ async def store_upload(file: UploadFile | None, subdirectory: str = "genel") -> 
     )
 
 
+def delete_stored_file(url: str | None) -> bool:
+    """``store_upload`` ile yazilmis bir dosyayi siler (en iyi caba).
+
+    Yalnizca ``/uploads/...`` ile baslayan ve ``UPLOAD_DIR`` icinde kalan
+    yollar silinir; baska her sey (harici URL, ``..`` vb.) sessizce yok sayilir.
+    """
+    prefix = "/uploads/"
+    if not url or not url.startswith(prefix):
+        return False
+    try:
+        root = config.upload_dir.resolve()
+        target = (root / url[len(prefix):]).resolve()
+        if root not in target.parents or not target.is_file():
+            return False
+        target.unlink()
+        return True
+    except OSError:
+        return False
+
+
 def sanitize_external_link(raw: str) -> str:
     """Tasarim referansi olarak yapistirilan baglantiyi dogrular.
 

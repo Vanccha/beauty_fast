@@ -72,6 +72,15 @@ export default async function KvkkPage() {
               </td>
             </tr>
             <tr>
+              <td>Kapora ödeme eşleştirme</td>
+              <td>
+                Havale açıklamasındaki randevu numarası ve ad (ör. &quot;R1234 Ayşe Y.&quot;), kapora
+                tutarı ve ödeme/iade durumu (banka hesap bilgileriniz salon tarafından saklanmaz)
+              </td>
+              <td>Kaporanın hangi randevuya ait olduğunu eşleştirmek, onaylamak ve gerekirse iade etmek</td>
+              <td>m.5/2-c sözleşmenin ifası; mali kayıtlar için m.5/2-ç hukuki yükümlülük</td>
+            </tr>
+            <tr>
               <td>Doğum tarihi</td>
               <td>Gün/ay/yıl (yalnızca siz paylaşırsanız)</td>
               <td>Doğum günü indirimi</td>
@@ -97,6 +106,18 @@ export default async function KvkkPage() {
                 m.6/3 <strong>açık rızanız</strong> —{' '}
                 <Link href="/acik-riza#saglik">Açık Rıza Metni</Link>
               </td>
+            </tr>
+            <tr>
+              <td>Aydınlatma ve sağlık beyanı kaydı</td>
+              <td>
+                Aydınlatma metnini okuduğunuza ve sağlık beyanını yaptığınıza dair onayların
+                zamanı (randevu kaydıyla birlikte tutulur)
+              </td>
+              <td>
+                Aydınlatma yükümlülüğünün yerine getirildiğinin ve beyanın ispatı; randevunun
+                güvenle yürütülmesi
+              </td>
+              <td>m.5/2-ç hukuki yükümlülük, m.5/2-c sözleşmenin ifası</td>
             </tr>
             <tr>
               <td>Müşteri yorumu</td>

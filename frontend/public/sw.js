@@ -15,9 +15,16 @@
  * ÖNBELLEĞE ALINMAZ — paylaşılan bir tablette başka birinin bilgisi
  * görünmesin; çevrimdışıyken bunların yerine doğrudan /offline açılır.
  *
+ * Web Push: `push` olayı bildirimi gösterir, `notificationclick` açık bir /admin
+ * sekmesini odaklayıp ilgili sayfaya götürür (yoksa yeni pencere açar).
+ * `?push-only` ile kaydedilen kopya (yalnızca `next dev` altında) önbelleğe hiç
+ * dokunmaz; sadece bildirim olaylarını işler.
+ *
  * Yeni sürüm yayınlarken VERSION değerini artırmak eski önbellekleri temizler.
  */
-const VERSION = 'v2';
+const VERSION = 'v3';
+/** Geliştirmede kullanılan, önbelleksiz kopya. */
+const PUSH_ONLY = new URL(self.location.href).searchParams.has('push-only');
 const STATIC_CACHE = `aurora-static-${VERSION}`;
 const PAGE_CACHE = `aurora-pages-${VERSION}`;
 const MEDIA_CACHE = `aurora-media-${VERSION}`;
@@ -31,6 +38,10 @@ const CACHEABLE_PAGES = ['/', '/portfolyo', '/yorumlar'];
 const MEDIA_LIMIT = 120;
 
 self.addEventListener('install', (event) => {
+  if (PUSH_ONLY) {
+    event.waitUntil(self.skipWaiting());
+    return;
+  }
   event.waitUntil(
     caches
       .open(STATIC_CACHE)
@@ -71,6 +82,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  if (PUSH_ONLY) return;
   const { request } = event;
   if (request.method !== 'GET') return;
 
@@ -161,3 +173,51 @@ async function trimCache(cache, limit) {
   const keys = await cache.keys();
   for (let i = 0; i < keys.length - limit; i++) await cache.delete(keys[i]);
 }
+
+// ---------------------------------------------------------------------
+// Web Push
+// ---------------------------------------------------------------------
+
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : '' };
+  }
+  const title = data.title || 'Aurora';
+  const options = {
+    body: data.body || '',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    // Aynı etiketli bildirim öncekinin yerine geçer (yinelenenler birikmez).
+    tag: data.tag || undefined,
+    renotify: Boolean(data.tag),
+    data: { url: data.url || '/admin' },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = new URL((event.notification.data && event.notification.data.url) || '/admin', self.location.origin);
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      // Önce açık bir panel sekmesi, yoksa herhangi bir sekme.
+      const existing = all.find((c) => new URL(c.url).pathname.startsWith('/admin')) || all[0];
+      if (existing) {
+        await existing.focus();
+        if ('navigate' in existing) {
+          try {
+            await existing.navigate(target.href);
+          } catch {
+            /* navigate desteklenmiyorsa odaklamak yeterli */
+          }
+        }
+        return;
+      }
+      await self.clients.openWindow(target.href);
+    })(),
+  );
+});

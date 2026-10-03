@@ -40,7 +40,12 @@ CUSTOMER_COOKIE = "customer_session"
 #: Kilit sahipligini belirleyen anonim tarayici anahtari.
 VISITOR_COOKIE = "visitor_key"
 
-STAFF_TTL_DAYS = 7
+#: "Beni hatirla" isaretliyse: kalici cerez + 30 gunluk sunucu oturumu.
+STAFF_TTL_DAYS = 30
+#: Isaretli degilse: sunucu tarafinda kisa omur + tarayici-oturumu cerezi
+#: (max_age yok; tarayici kapaninca silinir). Personel oturumlari kayan
+#: yenilenmez; sure girisle sabittir.
+STAFF_SHORT_TTL_HOURS = 12
 CUSTOMER_TTL_DAYS = 180
 #: Kayan yenileme: oturumun kalan suresi bu gunun altina inince kullanimda
 #: sureyi yeniden CUSTOMER_TTL_DAYS'e uzatir (her istekte yazma olmasin
@@ -95,7 +100,15 @@ def _expiry(days: int) -> datetime:
     return now_local() + timedelta(days=days)
 
 
-def _set_cookie(response: Response, name: str, value: str, expires_at: datetime, http_only=True):
+def _set_cookie(
+    response: Response,
+    name: str,
+    value: str,
+    expires_at: datetime,
+    http_only=True,
+    persistent=True,
+):
+    """``persistent=False``: ``max_age`` verilmez -> tarayici-oturumu cerezi."""
     response.set_cookie(
         key=name,
         value=value,
@@ -103,7 +116,7 @@ def _set_cookie(response: Response, name: str, value: str, expires_at: datetime,
         samesite="lax",
         path="/",
         secure=config.is_production,
-        max_age=int((expires_at - now_local()).total_seconds()),
+        max_age=int((expires_at - now_local()).total_seconds()) if persistent else None,
     )
 
 
@@ -112,12 +125,18 @@ def _set_cookie(response: Response, name: str, value: str, expires_at: datetime,
 # ---------------------------------------------------------------------
 
 
-def create_staff_session(db: Session, response: Response, staff_id: int) -> str:
+def create_staff_session(
+    db: Session, response: Response, staff_id: int, remember_me: bool = False
+) -> str:
     token = uuid4().hex
-    expires_at = _expiry(STAFF_TTL_DAYS)
+    expires_at = (
+        _expiry(STAFF_TTL_DAYS)
+        if remember_me
+        else now_local() + timedelta(hours=STAFF_SHORT_TTL_HOURS)
+    )
     db.add(StaffSession(token=token, staff_id=staff_id, expires_at=expires_at))
     db.commit()
-    _set_cookie(response, STAFF_COOKIE, token, expires_at)
+    _set_cookie(response, STAFF_COOKIE, token, expires_at, persistent=remember_me)
     return token
 
 

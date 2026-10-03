@@ -35,6 +35,7 @@ from ..models import (
     Staff,
     StaffService,
 )
+from ..services import deposit, deposit_watch, push
 from ..services.booking_for_other import clean_person_name
 from ..services.catalog import get_default_branch
 from ..services.reviews import (
@@ -50,6 +51,20 @@ from ..services.welcome import build_welcome, get_opening_hours, get_salon_stats
 from ..time_utils import now_local
 
 router = APIRouter(tags=["public"], route_class=EnvelopeRoute)
+
+
+@router.get("/api/deposit/info")
+def deposit_info(db: DbSession) -> dict:
+    """Kapora acik mi + politika metni (rezervasyon adimi 5 icin). Gizli
+    bilgi (IBAN vb.) DONMEZ; o yalnizca randevu olusunca alana gider."""
+    settings = deposit.load_settings(db)
+    return {
+        "enabled": settings.enabled,
+        "percent": settings.percent,
+        "minAmount": settings.min_amount,
+        "policy": deposit.POLICY_TEXT if settings.enabled else None,
+        "cancelMinutes": deposit.CANCEL_MIN_MINUTES,
+    }
 
 
 @router.get("/api/me")
@@ -402,6 +417,8 @@ def create_review(body: CreateReviewBody, customer: CustomerDep, db: DbSession) 
     )
     db.add(review)
     db.commit()
+    if review.rating <= 3:
+        push.notify_low_review(review.id)
 
     return {"id": review.id, "rating": review.rating, "createdAt": review.created_at.isoformat()}
 
@@ -431,8 +448,11 @@ def cron_sweep(db: DbSession) -> dict:
     retention = sweep_retention(db, now)
 
     delivery = deliver_due_notifications(db, now)
+    # Kapora gecikme / iade hatirlatmalari (arka plan nobetcisi kapaliysa buradan)
+    deposit_alerts = deposit_watch.check_once(db, now)
 
     return {
+        "depositAlerts": deposit_alerts,
         "sweptAt": now.isoformat(),
         **locks,
         **sessions,

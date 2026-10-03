@@ -1,15 +1,24 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Check, CircleAlert, CircleCheck, TriangleAlert, UserRound } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  CalendarX,
+  Check,
+  ChevronLeft,
+  CircleAlert,
+  CircleCheck,
+  Info,
+  TriangleAlert,
+  UserRound,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   OpportunityBadge,
   ShadowBadge,
   ViewCountBadge,
-} from '@/components/engagement/EngagementBadge';
+} from "@/components/engagement/EngagementBadge";
 import {
   ApiError,
   apiGet,
@@ -17,12 +26,26 @@ import {
   apiUpload,
   durationLabel,
   formatTl,
-} from '@/lib/api-client';
-import { isValidMobile, normalizePhone as normalizeAnyPhone } from '@/lib/phone';
-import { CategoryIcon } from '@/components/marketing/CategoryIcon';
-import { NameEditor } from '@/components/auth/NameEditor';
-import { PhoneInput } from '@/components/auth/PhoneInput';
-import { PhoneVerify, type VerifiedCustomer } from '@/components/auth/PhoneVerify';
+} from "@/lib/api-client";
+import {
+  isValidMobile,
+  normalizePhone as normalizeAnyPhone,
+} from "@/lib/phone";
+import { CategoryIcon } from "@/components/marketing/CategoryIcon";
+import { NameEditor } from "@/components/auth/NameEditor";
+import { PhoneInput } from "@/components/auth/PhoneInput";
+import {
+  PhoneVerify,
+  type VerifiedCustomer,
+} from "@/components/auth/PhoneVerify";
+import {
+  AllergyOptIn,
+  allergyPayload,
+  EMPTY_ALLERGY,
+  RequiredConsents,
+  type AllergyState,
+} from "@/components/booking/ConsentChecks";
+import { DepositNotice, type CustomerDeposit } from "@/components/booking/DepositNotice";
 
 /* ------------------------------------------------------------------ */
 /* Tipler — API sözleşmesinin istemci tarafı karşılığı                 */
@@ -64,6 +87,11 @@ interface Slot {
   heldByYou?: boolean;
 }
 
+interface BusySlot {
+  startMin: number;
+  label: string;
+}
+
 interface StaffAvailability {
   staffId: number;
   staffName: string;
@@ -72,7 +100,13 @@ interface StaffAvailability {
   totalPrice: number;
   savedMin: number;
   slots: Slot[];
-  diagnostics: { requiredMin: number; longestFreeWindowMin: number; reason: string | null };
+  /** Mesai içinde dolu (seçilemez) başlangıç saatleri; yalnızca saat bilgisi. */
+  busySlots?: BusySlot[];
+  diagnostics: {
+    requiredMin: number;
+    longestFreeWindowMin: number;
+    reason: string | null;
+  };
 }
 
 /** Ziyaretçinin açık kilidinin özeti (`yourLock` ve `/api/slots/lock/active`). */
@@ -109,7 +143,12 @@ interface AvailabilityResponse {
     shadowWindows: { start: number; end: number; minutes: number }[];
   };
   staff: StaffAvailability[];
-  shadowUpsell: { serviceId: number; name: string; price: number; fitsWindowMin: number }[];
+  shadowUpsell: {
+    serviceId: number;
+    name: string;
+    price: number;
+    fitsWindowMin: number;
+  }[];
   /** Bu tarihte ziyaretçinin halihazırda tuttuğu saat (varsa). */
   yourLock: ActiveLock | null;
   message: string | null;
@@ -124,8 +163,19 @@ interface LockInfo {
   endLabel: string;
   expiresAt: string;
   totalMin: number;
+  /** İndirimsiz tutar. */
   totalPrice: number;
+  /** Kilit anındaki fırsat indirimi; kesin tutar onayda sunucuda yeniden hesaplanır. */
+  discountRate?: number;
+  discountedPrice?: number;
   savedMin: number;
+  /** Kapora önizlemesi: açıksa tutar (TL) ve politika metni. */
+  deposit?: {
+    enabled: boolean;
+    amount: number | null;
+    percent: number;
+    policy: string | null;
+  };
 }
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -133,11 +183,11 @@ type Step = 1 | 2 | 3 | 4 | 5;
 type Chosen = { staff: StaffAvailability; slot: Slot };
 
 const STEPS: { id: Step; label: string }[] = [
-  { id: 1, label: 'Hizmet' },
-  { id: 2, label: 'Usta' },
-  { id: 3, label: 'Saat' },
-  { id: 4, label: 'Görsel' },
-  { id: 5, label: 'Onay' },
+  { id: 1, label: "Hizmet" },
+  { id: 2, label: "Personel" },
+  { id: 3, label: "Saat" },
+  { id: 4, label: "Görsel" },
+  { id: 5, label: "Onay" },
 ];
 
 /** Tarih seçicide gösterilecek gün sayısı. */
@@ -145,24 +195,24 @@ const DAY_WINDOW = 14;
 
 /** Tasarım görseli için üst sınır (sunucu da 8 MB'ı reddeder). */
 const MAX_DESIGN_BYTES = 8 * 1024 * 1024;
-const DESIGN_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const DESIGN_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 function dateKey(offset: number): string {
   const d = new Date();
   d.setDate(d.getDate() + offset);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function dayChipLabel(key: string): { weekday: string; day: string } {
   const d = new Date(`${key}T00:00:00`);
   return {
-    weekday: ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][d.getDay()],
+    weekday: ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"][d.getDay()],
     day: String(d.getDate()),
   };
 }
 
 /** "Kimin için?" seçimi (Grup ayrı sayfadır, burada tutulmaz). */
-type BookingMode = 'self' | 'other';
+type BookingMode = "self" | "other";
 
 /** Girilen telefonu saklama biçimine çevirir (geçersizse null). Kurallar `lib/phone.ts`'te. */
 function normalizePhone(raw: string): string | null {
@@ -176,28 +226,31 @@ function validName(raw: string): boolean {
   return NAME_RE.test(raw.trim());
 }
 
-const RATE_LIMIT_TEXT = 'Çok fazla deneme yaptın. Lütfen biraz bekleyip tekrar dene.';
+const RATE_LIMIT_TEXT =
+  "Çok fazla deneme yaptın. Lütfen biraz bekleyip tekrar dene.";
 
 /** Kilit alınamadığında kullanıcıya gösterilecek metin. */
 function lockErrorMessage(e: unknown): string {
-  if (e instanceof ApiError && e.code === 'SLOT_TAKEN') {
-    const heldUntil = (e.details as { heldUntil?: string | null } | undefined)?.heldUntil;
+  if (e instanceof ApiError && e.code === "SLOT_TAKEN") {
+    const heldUntil = (e.details as { heldUntil?: string | null } | undefined)
+      ?.heldUntil;
     return heldUntil
-      ? `Bu saat az önce alındı; ${new Date(heldUntil).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}'e kadar rezerve.`
-      : 'Bu saat az önce başka bir müşteri tarafından alındı.';
+      ? `Bu saat az önce alındı; ${new Date(heldUntil).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}'e kadar rezerve.`
+      : "Bu saat az önce başka bir müşteri tarafından alındı.";
   }
-  if (e instanceof ApiError && e.code === 'RATE_LIMITED') return RATE_LIMIT_TEXT;
-  return e instanceof ApiError ? e.message : 'Saat rezerve edilemedi.';
+  if (e instanceof ApiError && e.code === "RATE_LIMITED")
+    return RATE_LIMIT_TEXT;
+  return e instanceof ApiError ? e.message : "Saat rezerve edilemedi.";
 }
 
 /** Bu kodlar "seçili saat artık kullanılamaz" demektir → 3. adıma dön. */
 const SLOT_LOST_CODES = new Set([
-  'SLOT_TAKEN',
-  'SLOT_UNAVAILABLE',
-  'LOCK_EXPIRED',
-  'LOCK_NOT_FOUND',
-  'FORBIDDEN',
-  'CUSTOMER_OVERLAP',
+  "SLOT_TAKEN",
+  "SLOT_UNAVAILABLE",
+  "LOCK_EXPIRED",
+  "LOCK_NOT_FOUND",
+  "FORBIDDEN",
+  "CUSTOMER_OVERLAP",
 ]);
 
 /* ------------------------------------------------------------------ */
@@ -238,7 +291,7 @@ interface BookingDraft {
   recipientPhone?: string;
 }
 
-const DRAFT_KEY = 'randevu-taslak-v1';
+const DRAFT_KEY = "randevu-taslak-v1";
 /** Bundan eski taslaklar geri yüklenmez. */
 const DRAFT_MAX_AGE_MS = 2 * 60 * 60 * 1000;
 
@@ -247,21 +300,27 @@ function readDraft(): BookingDraft | null {
     const raw = window.sessionStorage.getItem(DRAFT_KEY);
     if (!raw) return null;
     const draft = JSON.parse(raw) as BookingDraft;
-    if ((draft.v !== 1 && draft.v !== 2) || Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS) return null;
+    if (
+      (draft.v !== 1 && draft.v !== 2) ||
+      Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS
+    )
+      return null;
     return draft;
   } catch {
     return null;
   }
 }
 
-function writeDraft(draft: Omit<BookingDraft, 'v' | 'savedAt'>) {
+function writeDraft(draft: Omit<BookingDraft, "v" | "savedAt">) {
   try {
     const compact: BookingDraft = {
       ...draft,
       v: 2,
       savedAt: Date.now(),
       // Slot listesi saklanmaz: dönüşte zaten yeniden sorgulanır.
-      chosen: draft.chosen ? { ...draft.chosen, staff: { ...draft.chosen.staff, slots: [] } } : null,
+      chosen: draft.chosen
+        ? { ...draft.chosen, staff: { ...draft.chosen.staff, slots: [] } }
+        : null,
     };
     window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify(compact));
   } catch {
@@ -305,9 +364,14 @@ export function BookingFlow({
   /** Doğrulama sayfa içinde yapılır; sunucu prop'u yalnızca başlangıç değeridir. */
   const [member, setMember] = useState(isMember);
   const [memberName, setMemberName] = useState<string | null>(customerName);
-  const [mode, setMode] = useState<BookingMode>('self');
-  const [recipientName, setRecipientName] = useState('');
-  const [recipientPhone, setRecipientPhone] = useState('');
+  const [mode, setMode] = useState<BookingMode>("self");
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("");
+  // Onaylar yalnızca bellekte tutulur (OTP satır içi; yönlendirme yok). Alerji
+  // metni sağlık verisi olduğundan hiçbir depoya yazılmaz.
+  const [privacyAck, setPrivacyAck] = useState(false);
+  const [healthDecl, setHealthDecl] = useState(false);
+  const [allergy, setAllergy] = useState<AllergyState>(EMPTY_ALLERGY);
   // Taslaktan geri yüklenince numara alanı yeni değerle yeniden kurulur.
   const [phoneInputKey, setPhoneInputKey] = useState(0);
 
@@ -319,18 +383,20 @@ export function BookingFlow({
   const [staffId, setStaffId] = useState<number | null>(null);
   const [date, setDate] = useState(dateKey(0));
 
-  const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
+  const [availability, setAvailability] = useState<AvailabilityResponse | null>(
+    null,
+  );
   const [loadingSlots, setLoadingSlots] = useState(false);
 
   const [chosen, setChosen] = useState<Chosen | null>(null);
   const [lock, setLock] = useState<LockInfo | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
 
-  const [designLink, setDesignLink] = useState('');
+  const [designLink, setDesignLink] = useState("");
   const [designFile, setDesignFile] = useState<File | null>(null);
   /** Girişe gidip dönerken seçilen dosya korunamadı → kullanıcıya hatırlat. */
   const [lostDesignFile, setLostDesignFile] = useState(false);
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState("");
 
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -351,13 +417,16 @@ export function BookingFlow({
     savedMin: number;
     designUploadFailed: boolean;
     forName: string | null;
+    /** Kapora bekleniyorsa ödeme bilgileri (randevu henüz kesinleşmedi). */
+    deposit: CustomerDeposit | null;
   } | null>(null);
 
   const recipientPhoneNorm = normalizePhone(recipientPhone);
-  const recipientValid = validName(recipientName) && recipientPhoneNorm !== null;
+  const recipientValid =
+    validName(recipientName) && recipientPhoneNorm !== null;
   /** Sunucuya gidecek alıcı (yalnızca "Başkası adına" modunda). */
   const beneficiary =
-    mode === 'other' && recipientPhoneNorm
+    mode === "other" && recipientPhoneNorm
       ? { firstName: recipientName.trim(), phone: recipientPhoneNorm }
       : undefined;
 
@@ -369,18 +438,25 @@ export function BookingFlow({
   }
 
   const selectedServices = useMemo(
-    () => selectedIds.map((id) => services.find((s) => s.id === id)!).filter(Boolean),
+    () =>
+      selectedIds
+        .map((id) => services.find((s) => s.id === id)!)
+        .filter(Boolean),
     [selectedIds, services],
   );
 
   /** Sunucu hesabı gelene kadar gösterilecek KABA toplam (sıkıştırma hariç). */
   const naiveTotalMin = selectedServices.reduce(
-    (sum, s) => sum + s.activeBeforeMin + s.passiveMin + s.activeAfterMin + s.bufferMin,
+    (sum, s) =>
+      sum + s.activeBeforeMin + s.passiveMin + s.activeAfterMin + s.bufferMin,
     0,
   );
   const naiveTotalPrice = selectedServices.reduce((sum, s) => sum + s.price, 0);
 
-  const days = useMemo(() => Array.from({ length: DAY_WINDOW }, (_, i) => dateKey(i)), []);
+  const days = useMemo(
+    () => Array.from({ length: DAY_WINDOW }, (_, i) => dateKey(i)),
+    [],
+  );
 
   /* ---------------- Müsaitlik sorgusu ---------------- */
 
@@ -392,11 +468,15 @@ export function BookingFlow({
     const seq = ++availabilitySeq.current;
     setLoadingSlots(true);
     try {
-      const result = await apiSend<AvailabilityResponse>('/api/availability', 'POST', {
-        date,
-        serviceIds: selectedIds,
-        staffId,
-      });
+      const result = await apiSend<AvailabilityResponse>(
+        "/api/availability",
+        "POST",
+        {
+          date,
+          serviceIds: selectedIds,
+          staffId,
+        },
+      );
       if (seq !== availabilitySeq.current) return;
       setAvailability(result);
 
@@ -410,12 +490,13 @@ export function BookingFlow({
           return staff && slot ? { staff, slot } : null;
         };
         if (prev) return find(prev.staff.staffId, prev.slot.startMin);
-        if (result.yourLock) return find(result.yourLock.staffId, result.yourLock.startMin);
+        if (result.yourLock)
+          return find(result.yourLock.staffId, result.yourLock.startMin);
         return null;
       });
     } catch (e) {
       if (seq !== availabilitySeq.current) return;
-      setError(e instanceof ApiError ? e.message : 'Uygun saatler alınamadı.');
+      setError(e instanceof ApiError ? e.message : "Uygun saatler alınamadı.");
       setAvailability(null);
     } finally {
       if (seq === availabilitySeq.current) setLoadingSlots(false);
@@ -449,14 +530,14 @@ export function BookingFlow({
     const restoredDate = draft.date >= today ? draft.date : today;
     const sameDate = restoredDate === draft.date;
 
-    const draftMode: BookingMode = draft.mode === 'other' ? 'other' : 'self';
+    const draftMode: BookingMode = draft.mode === "other" ? "other" : "self";
     const draftBeneficiary =
-      draftMode === 'other' && draft.recipientPhone
-        ? { firstName: draft.recipientName ?? '', phone: draft.recipientPhone }
+      draftMode === "other" && draft.recipientPhone
+        ? { firstName: draft.recipientName ?? "", phone: draft.recipientPhone }
         : undefined;
     setMode(draftMode);
-    setRecipientName(draft.recipientName ?? '');
-    setRecipientPhone(draft.recipientPhone ?? '');
+    setRecipientName(draft.recipientName ?? "");
+    setRecipientPhone(draft.recipientPhone ?? "");
     setPhoneInputKey((k) => k + 1);
     setSelectedIds(draft.serviceIds);
     setStaffId(draft.staffId);
@@ -482,7 +563,9 @@ export function BookingFlow({
         // 1) Kilit hâlâ bizim ve geçerli mi?
         let active: ActiveLock | null = null;
         try {
-          active = (await apiGet<{ lock: ActiveLock | null }>('/api/slots/lock/active')).lock;
+          active = (
+            await apiGet<{ lock: ActiveLock | null }>("/api/slots/lock/active")
+          ).lock;
         } catch {
           active = null;
         }
@@ -498,7 +581,7 @@ export function BookingFlow({
 
         // 2) Süresi dolmuş: aynı saati yeniden tutmayı dene.
         try {
-          const relocked = await apiSend<LockInfo>('/api/slots/lock', 'POST', {
+          const relocked = await apiSend<LockInfo>("/api/slots/lock", "POST", {
             date: restoredDate,
             serviceIds: draft.serviceIds,
             staffId: draftChosen.staff.staffId,
@@ -509,15 +592,18 @@ export function BookingFlow({
           setChosen(draftChosen);
           setLock(relocked);
           setStep(resumeStep);
-          setNotice('Rezervasyon süren dolmuştu; aynı saati senin için yeniden tuttuk.');
+          setNotice(
+            "Rezervasyon süren dolmuştu; aynı saati senin için yeniden tuttuk.",
+          );
         } catch (e) {
           if (cancelled) return;
           // 3) Saat artık uygun değil: hizmet/usta/tarih korunarak 3. adım.
           setChosen(null);
           setStep(3);
           setError(
-            e instanceof ApiError && (e.code === 'SLOT_TAKEN' || e.code === 'SLOT_UNAVAILABLE')
-              ? 'Tuttuğun saatin süresi doldu ve saat artık uygun değil. Seçimlerin korundu — lütfen yeni bir saat seç.'
+            e instanceof ApiError &&
+              (e.code === "SLOT_TAKEN" || e.code === "SLOT_UNAVAILABLE")
+              ? "Tuttuğun saatin süresi doldu ve saat artık uygun değil. Seçimlerin korundu — lütfen yeni bir saat seç."
               : lockErrorMessage(e),
           );
         }
@@ -595,7 +681,7 @@ export function BookingFlow({
         setChosen(null);
         setNotice(null);
         setStep(3);
-        setError('Rezervasyon süren doldu. Lütfen saati yeniden seç.');
+        setError("Rezervasyon süren doldu. Lütfen saati yeniden seç.");
       }
     };
     tick();
@@ -611,7 +697,9 @@ export function BookingFlow({
     if (!current) return;
     setLock(null);
     setNotice(null);
-    await apiSend(`/api/slots/lock/${current.lockId}`, 'DELETE').catch(() => undefined);
+    await apiSend(`/api/slots/lock/${current.lockId}`, "DELETE").catch(
+      () => undefined,
+    );
   }
 
   /**
@@ -639,7 +727,9 @@ export function BookingFlow({
   }
 
   function toggleService(id: number) {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
     setAvailability(null);
     setChosen(null);
   }
@@ -654,11 +744,11 @@ export function BookingFlow({
     if (staffId !== null) {
       try {
         const result = await apiGet<{ staff: { id: number }[] }>(
-          `/api/catalog/staff?serviceIds=${[...selectedIds, serviceId].join(',')}`,
+          `/api/catalog/staff?serviceIds=${[...selectedIds, serviceId].join(",")}`,
         );
         if (!result.staff.some((s) => s.id === staffId)) {
           setError(
-            'Seçtiğin usta bu hizmeti yapmıyor. Eklemek istersen usta adımında "Farketmez"i seçebilirsin.',
+            'Seçtiğin personel bu hizmeti yapmıyor. Eklemek istersen personel adımında "Farketmez"i seçebilirsin.',
           );
           return;
         }
@@ -674,7 +764,7 @@ export function BookingFlow({
     setError(null);
 
     // Engagement sayacı GERÇEK veriden beslensin diye görüntüleme kaydı.
-    void apiSend('/api/slots/view', 'POST', {
+    void apiSend("/api/slots/view", "POST", {
       date,
       staffId: staff.staffId,
       startMin: slot.startMin,
@@ -687,7 +777,7 @@ export function BookingFlow({
     setError(null);
     setNotice(null);
     try {
-      const result = await apiSend<LockInfo>('/api/slots/lock', 'POST', {
+      const result = await apiSend<LockInfo>("/api/slots/lock", "POST", {
         date,
         serviceIds: selectedIds,
         staffId: chosen.staff.staffId,
@@ -697,11 +787,13 @@ export function BookingFlow({
       setLock(result);
       setStep(4);
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'MEMBERSHIP_REQUIRED') {
+      if (e instanceof ApiError && e.code === "MEMBERSHIP_REQUIRED") {
         // Oturum düşmüş: tekrar doğrulat (seçimler korunur).
         setMember(false);
         setStep(1);
-        setError('Başkası adına randevu için önce kendi numaranı doğrulaman gerekiyor.');
+        setError(
+          "Başkası adına randevu için önce kendi numaranı doğrulaman gerekiyor.",
+        );
         return;
       }
       setError(lockErrorMessage(e));
@@ -723,12 +815,12 @@ export function BookingFlow({
   function pickDesignFile(file: File | null) {
     setError(null);
     if (file && !DESIGN_TYPES.includes(file.type)) {
-      setError('Yalnızca JPG, PNG veya WEBP görsel yükleyebilirsin.');
+      setError("Yalnızca JPG, PNG veya WEBP görsel yükleyebilirsin.");
       setDesignFile(null);
       return;
     }
     if (file && file.size > MAX_DESIGN_BYTES) {
-      setError('Görsel en fazla 8 MB olabilir.');
+      setError("Görsel en fazla 8 MB olabilir.");
       setDesignFile(null);
       return;
     }
@@ -740,6 +832,7 @@ export function BookingFlow({
     if (!lock || !chosen) return;
     // Doğrulanmamışsa 5. adımda satır içi doğrulama kartı gösterilir.
     if (!member) return;
+    if (!privacyAck || !healthDecl) return;
     setBusy(true);
     setError(null);
     try {
@@ -751,11 +844,16 @@ export function BookingFlow({
           totalPrice: number;
           discountRate: number;
         };
-        allergyWarnings: { label: string; severity: string; note: string | null }[];
+        allergyWarnings: {
+          label: string;
+          severity: string;
+          note: string | null;
+        }[];
         savedMin: number;
         forCustomer?: { id: number; firstName: string };
         bookedForOther?: boolean;
-      }>('/api/appointments', 'POST', {
+        deposit?: CustomerDeposit | null;
+      }>("/api/appointments", "POST", {
         lockId: lock.lockId,
         date,
         staffId: chosen.staff.staffId,
@@ -765,6 +863,9 @@ export function BookingFlow({
         notes: notes || undefined,
         designLink: designLink || undefined,
         beneficiary,
+        privacyNoticeAck: true,
+        healthDeclaration: true,
+        ...(mode === "self" ? (allergyPayload(allergy) ?? {}) : {}),
       });
 
       // Dosya yüklemesi randevu oluştuktan SONRA yapılır (id gerekiyor).
@@ -772,8 +873,11 @@ export function BookingFlow({
       let designUploadFailed = false;
       if (designFile) {
         const form = new FormData();
-        form.append('file', designFile);
-        await apiUpload(`/api/appointments/${result.appointment.id}/design`, form).catch(() => {
+        form.append("file", designFile);
+        await apiUpload(
+          `/api/appointments/${result.appointment.id}/design`,
+          form,
+        ).catch(() => {
           designUploadFailed = true;
         });
       }
@@ -785,7 +889,7 @@ export function BookingFlow({
         startLabel: result.appointment.startLabel,
         endLabel: result.appointment.endLabel,
         staffName: chosen.staff.staffName,
-        serviceNames: selectedServices.map((s) => s.name).join(' + '),
+        serviceNames: selectedServices.map((s) => s.name).join(" + "),
         totalPrice: result.appointment.totalPrice,
         discountRate: result.appointment.discountRate,
         allergyWarnings: result.allergyWarnings,
@@ -794,10 +898,11 @@ export function BookingFlow({
         forName: result.bookedForOther
           ? (result.forCustomer?.firstName ?? recipientName.trim())
           : null,
+        deposit: result.deposit ?? null,
       });
       router.refresh();
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'MEMBERSHIP_REQUIRED') {
+      if (e instanceof ApiError && e.code === "MEMBERSHIP_REQUIRED") {
         // Oturum yok/düştü: yönlendirme yok, 5. adımda satır içi doğrulama açılır.
         setMember(false);
         setError(null);
@@ -805,14 +910,20 @@ export function BookingFlow({
       }
       setError(
         e instanceof ApiError
-          ? e.code === 'RATE_LIMITED'
+          ? e.code === "RATE_LIMITED"
             ? RATE_LIMIT_TEXT
-            : e.message
-          : 'Randevu oluşturulamadı.',
+            : e.code === "PRIVACY_NOTICE_REQUIRED"
+              ? "Devam etmek için KVKK Aydınlatma Metni'ni okuduğunu işaretlemelisin."
+              : e.code === "HEALTH_DECLARATION_REQUIRED"
+                ? "Devam etmek için sağlık beyanını işaretlemelisin."
+                : e.code === "CONSENT_REQUIRED"
+                  ? "Alerji bilgisinin kaydedilmesi için açık rıza kutusunu işaretlemelisin; işaretlemeden de randevu alabilirsin."
+                  : e.message
+          : "Randevu oluşturulamadı.",
       );
       if (e instanceof ApiError && SLOT_LOST_CODES.has(e.code)) {
         // CUSTOMER_OVERLAP'ta kilit hâlâ geçerli: bırak ki saat boşa tutulmasın.
-        if (e.code === 'CUSTOMER_OVERLAP') await dropLock();
+        if (e.code === "CUSTOMER_OVERLAP") await dropLock();
         setLock(null);
         setChosen(null);
         setNotice(null);
@@ -831,23 +942,42 @@ export function BookingFlow({
         <div className="flex justify-center text-success-600" aria-hidden>
           <CircleCheck size={44} strokeWidth={1.5} />
         </div>
-        <h1 className="display text-3xl">Randevun oluşturuldu</h1>
+        <h1 className="display text-3xl">
+          {confirmed.deposit?.status === "AWAITING"
+            ? "Kapora bekleniyor"
+            : memberName
+              ? `Sizi bekliyoruz, ${memberName}`
+              : "Sizi bekliyoruz"}
+        </h1>
+        <p className="muted -mt-2">
+          {confirmed.deposit?.status === "AWAITING"
+            ? "Randevunuz alındı; kaporanız ulaşınca kesinleşecek. Bilgileri WhatsApp'tan da gönderdik."
+            : "Randevunuz oluşturuldu. Detayları WhatsApp'tan gönderdik."}
+        </p>
+        {confirmed.deposit?.status === "AWAITING" && (
+          <div className="text-left">
+            <DepositNotice deposit={confirmed.deposit} />
+          </div>
+        )}
         <div className="card text-left">
           <p className="font-medium">
-            {new Date(`${date}T00:00:00`).toLocaleDateString('tr-TR', {
-              day: 'numeric',
-              month: 'long',
-              weekday: 'long',
+            {new Date(`${date}T00:00:00`).toLocaleDateString("tr-TR", {
+              day: "numeric",
+              month: "long",
+              weekday: "long",
             })}
           </p>
           <p className="muted">
-            {confirmed.startLabel} – {confirmed.endLabel} · {confirmed.staffName}
+            {confirmed.startLabel} – {confirmed.endLabel} ·{" "}
+            {confirmed.staffName}
           </p>
           {confirmed.forName && (
             <p className="mt-2 font-medium">Kimin için: {confirmed.forName}</p>
           )}
           <p className="mt-2">{confirmed.serviceNames}</p>
-          <p className="mt-2 text-lg font-semibold tabular-nums">{formatTl(confirmed.totalPrice)}</p>
+          <p className="mt-2 text-lg font-semibold tabular-nums">
+            {formatTl(confirmed.totalPrice)}
+          </p>
           {confirmed.discountRate > 0 && (
             <p className="muted">
               Fırsat saati indirimi: %{Math.round(confirmed.discountRate * 100)}
@@ -855,16 +985,29 @@ export function BookingFlow({
           )}
           {confirmed.savedMin > 0 && (
             <p className="alert alert-success mt-2">
-              <CircleCheck size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
-              <span>Paket sıkıştırması sayesinde {confirmed.savedMin} dakika erken çıkacaksın.</span>
+              <CircleCheck
+                size={18}
+                strokeWidth={1.5}
+                aria-hidden
+                className="mt-0.5 shrink-0"
+              />
+              <span>
+                Paket sıkıştırması sayesinde {confirmed.savedMin} dakika erken
+                çıkacaksın.
+              </span>
             </p>
           )}
           {confirmed.designUploadFailed && (
             <p className="alert alert-warning mt-2">
-              <TriangleAlert size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+              <TriangleAlert
+                size={18}
+                strokeWidth={1.5}
+                aria-hidden
+                className="mt-0.5 shrink-0"
+              />
               <span>
-                Randevun oluştu ama görselin yüklenemedi. Görseli randevuna gelirken
-                ustana gösterebilirsin.
+                Randevun oluştu ama görselin yüklenemedi. Görseli randevuna
+                gelirken personele gösterebilirsin.
               </span>
             </p>
           )}
@@ -872,27 +1015,37 @@ export function BookingFlow({
 
         {confirmed.forName && (
           <p className="alert alert-success text-left">
-            <CircleCheck size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
-            <span>{confirmed.forName} kişisine WhatsApp ile bilgi gönderildi.</span>
+            <CircleCheck
+              size={18}
+              strokeWidth={1.5}
+              aria-hidden
+              className="mt-0.5 shrink-0"
+            />
+            <span>
+              {confirmed.forName} kişisine WhatsApp ile bilgi gönderildi.
+            </span>
           </p>
         )}
 
         {confirmed.allergyWarnings.length > 0 && (
           <div className="alert alert-danger text-left">
-            <TriangleAlert size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+            <TriangleAlert
+              size={18}
+              strokeWidth={1.5}
+              aria-hidden
+              className="mt-0.5 shrink-0"
+            />
             <div>
-            <p className="font-semibold">Kayıtlı alerji uyarın</p>
-            <ul className="mt-1 space-y-1 text-sm">
-              {confirmed.allergyWarnings.map((a) => (
-                <li key={a.label}>
-                  <strong>{a.label}</strong>
-                  {a.note ? ` — ${a.note}` : ''}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-2 text-xs">
-              Bu uyarı ustaya da iletildi.
-            </p>
+              <p className="font-semibold">Kayıtlı alerji uyarın</p>
+              <ul className="mt-1 space-y-1 text-sm">
+                {confirmed.allergyWarnings.map((a) => (
+                  <li key={a.label}>
+                    <strong>{a.label}</strong>
+                    {a.note ? ` — ${a.note}` : ""}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs">Bu uyarı personele de iletildi.</p>
             </div>
           </div>
         )}
@@ -925,9 +1078,13 @@ export function BookingFlow({
   // Alt çubuktaki süre/tutar: en kesin bilgi hangisiyse o.
   // Kilit > seçilen ustanın hesabı > paket özeti (usta yoksa nominal) > kaba toplam.
   const barTotal = lock
-    ? { min: lock.totalMin, price: lock.totalPrice, approx: false }
+    ? { min: lock.totalMin, price: lock.discountedPrice ?? lock.totalPrice, approx: false }
     : chosen
-      ? { min: chosen.staff.totalMin, price: chosen.staff.totalPrice, approx: false }
+      ? {
+          min: chosen.staff.totalMin,
+          price: chosen.staff.totalPrice,
+          approx: false,
+        }
       : availability
         ? {
             min: availability.package.totalMin,
@@ -941,45 +1098,66 @@ export function BookingFlow({
       <Stepper step={step} onJump={(s) => void goToStep(s)} />
 
       {error && (
-        <p className={`alert ${error === RATE_LIMIT_TEXT ? 'alert-warning' : 'alert-danger'}`}>
-          <CircleAlert size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+        <p
+          className={`alert ${error === RATE_LIMIT_TEXT ? "alert-warning" : "alert-danger"}`}
+        >
+          <CircleAlert
+            size={18}
+            strokeWidth={1.5}
+            aria-hidden
+            className="mt-0.5 shrink-0"
+          />
           <span>{error}</span>
         </p>
       )}
 
       {notice && !error && (
         <p className="alert alert-success">
-          <CircleCheck size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+          <CircleCheck
+            size={18}
+            strokeWidth={1.5}
+            aria-hidden
+            className="mt-0.5 shrink-0"
+          />
           <span>{notice}</span>
         </p>
       )}
 
+      {step >= 2 && (
+        <BackLink
+          label={STEPS[step - 2].label}
+          disabled={busy}
+          onClick={() => void goToStep((step - 1) as Step)}
+        />
+      )}
 
       {/* ---------- 1) Hizmet seçimi ---------- */}
       {step === 1 && (
         <section className="space-y-3">
-          <h1 className="display text-3xl md:text-4xl">Hangi hizmetleri istiyorsun?</h1>
-          <p className="muted">
-            Birden fazla seçebilirsin — sistem hepsini <strong>tek kesintisiz blok</strong> hâline
-            getirir ve mümkünse birbirinin bekleme süresine yerleştirerek toplam süreyi kısaltır.
-          </p>
+          <h1 className="display text-3xl md:text-4xl">
+            Hangi hizmetleri istiyorsun?
+          </h1>
 
           <div>
             <p className="label">Kimin için?</p>
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Kimin için?">
+            <div
+              className="flex flex-wrap gap-2"
+              role="group"
+              aria-label="Kimin için?"
+            >
               <button
                 type="button"
-                aria-pressed={mode === 'self'}
-                onClick={() => setMode('self')}
-                className={`chip ${mode === 'self' ? 'chip-active' : ''}`}
+                aria-pressed={mode === "self"}
+                onClick={() => setMode("self")}
+                className={`chip ${mode === "self" ? "chip-active" : ""}`}
               >
                 Kendim
               </button>
               <button
                 type="button"
-                aria-pressed={mode === 'other'}
-                onClick={() => setMode('other')}
-                className={`chip ${mode === 'other' ? 'chip-active' : ''}`}
+                aria-pressed={mode === "other"}
+                onClick={() => setMode("other")}
+                className={`chip ${mode === "other" ? "chip-active" : ""}`}
               >
                 Başkası adına
               </button>
@@ -989,8 +1167,8 @@ export function BookingFlow({
                 onClick={() =>
                   router.push(
                     selectedIds.length
-                      ? `/randevu/grup?services=${selectedIds.join(',')}`
-                      : '/randevu/grup',
+                      ? `/randevu/grup?services=${selectedIds.join(",")}`
+                      : "/randevu/grup",
                   )
                 }
                 className="chip"
@@ -1000,7 +1178,7 @@ export function BookingFlow({
             </div>
           </div>
 
-          {mode === 'other' && (
+          {mode === "other" && (
             <div className="card space-y-4">
               {!member && (
                 <PhoneVerify
@@ -1024,8 +1202,10 @@ export function BookingFlow({
                     placeholder="Ayşe"
                     autoComplete="off"
                   />
-                  {recipientName.trim() !== '' && !validName(recipientName) && (
-                    <p className="mt-1 text-xs text-danger-700">Ad yalnızca harf içermeli.</p>
+                  {recipientName.trim() !== "" && !validName(recipientName) && (
+                    <p className="mt-1 text-xs text-danger-700">
+                      Ad yalnızca harf içermeli.
+                    </p>
                   )}
                 </div>
                 <div>
@@ -1039,11 +1219,13 @@ export function BookingFlow({
                     onChange={setRecipientPhone}
                     autoComplete="off"
                   />
-                  {recipientPhone.trim() !== '' && recipientPhoneNorm === null && (
-                    <p className="mt-1 text-xs text-danger-700">
-                      Geçerli bir cep telefonu gir (yurtdışı için ülke kodunu seç).
-                    </p>
-                  )}
+                  {recipientPhone.trim() !== "" &&
+                    recipientPhoneNorm === null && (
+                      <p className="mt-1 text-xs text-danger-700">
+                        Geçerli bir cep telefonu gir (yurtdışı için ülke kodunu
+                        seç).
+                      </p>
+                    )}
                 </div>
               </div>
               <p className="muted">
@@ -1058,7 +1240,7 @@ export function BookingFlow({
                 key={c.id}
                 type="button"
                 onClick={() => setActiveCategory(c.id)}
-                className={`chip shrink-0 ${activeCategory === c.id ? 'chip-active' : ''}`}
+                className={`chip shrink-0 ${activeCategory === c.id ? "chip-active" : ""}`}
               >
                 <CategoryIcon slug={c.slug} /> {c.name}
               </button>
@@ -1081,17 +1263,19 @@ export function BookingFlow({
                       type="button"
                       onClick={() => toggleService(service.id)}
                       aria-pressed={selected}
-                      className={`w-full rounded-[4px] border p-4 text-left transition-colors ${
+                      className={`w-full rounded-2xl border p-4 text-left transition-colors ${
                         selected
-                          ? 'border-plum-600 bg-plum-50'
-                          : 'border-sand-200 bg-white hover:border-ink-300'
+                          ? "border-plum-400 bg-plum-50 ring-1 ring-plum-300"
+                          : "border-sand-200 bg-white hover:border-plum-200 hover:bg-plum-50/40"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-medium">{service.name}</p>
                           {service.description && (
-                            <p className="mt-0.5 muted">{service.description}</p>
+                            <p className="mt-0.5 muted">
+                              {service.description}
+                            </p>
                           )}
                           <div className="mt-2 flex flex-wrap gap-1.5">
                             <span className="badge bg-sand-100 text-ink-700">
@@ -1100,19 +1284,16 @@ export function BookingFlow({
                             {service.passiveMin > 0 && (
                               <span
                                 className="badge bg-plum-50 text-plum-700"
-                                title="Bu sürede usta serbest — araya başka bir işlem sığabilir"
+                                title="Bu sürede personel serbest — araya başka bir işlem sığabilir"
                               >
                                 {service.passiveMin} dk bekleme
                               </span>
                             )}
-                            {service.shadowGuestAllowed && (
-                              <span className="badge bg-success-50 text-success-700">
-                                Ara saate sığar
-                              </span>
-                            )}
                           </div>
                         </div>
-                        <span className="shrink-0 font-semibold tabular-nums">{formatTl(service.price)}</span>
+                        <span className="shrink-0 font-semibold tabular-nums">
+                          {formatTl(service.price)}
+                        </span>
                       </div>
                     </button>
                   </li>
@@ -1124,7 +1305,7 @@ export function BookingFlow({
 
       {/* ---------- 2) Usta seçimi ---------- */}
       {/* Hizmet bağlantısıyla gelen 1. adımı atlar; "Kimin için?" seçimini kaçırmasın. */}
-      {step === 2 && initialServiceIds.length > 0 && mode === 'self' && (
+      {step === 2 && initialServiceIds.length > 0 && mode === "self" && (
         <p className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-500">
           <UserRound size={16} strokeWidth={1.5} aria-hidden />
           <span>Kendin için alıyorsun.</span>
@@ -1149,7 +1330,9 @@ export function BookingFlow({
       {/* ---------- 3) Tarih + slot ---------- */}
       {step === 3 && (
         <section className="space-y-3">
-          <h1 className="display text-3xl md:text-4xl">Ne zaman gelmek istersin?</h1>
+          <h1 className="display text-3xl md:text-4xl">
+            Ne zaman gelmek istersin?
+          </h1>
 
           <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
             {days.map((d) => {
@@ -1165,25 +1348,41 @@ export function BookingFlow({
                     setChosen(null);
                     setError(null);
                   }}
-                  className={`chip w-14 shrink-0 touch-target flex-col gap-0 py-2 ${
-                    active ? 'chip-active chip-primary' : ''
+                  className={`chip w-14 shrink-0 touch-target flex-col rounded-2xl gap-0 py-2 ${
+                    active ? "chip-active chip-primary" : ""
                   }`}
                 >
                   <span className="text-xs opacity-80">{chip.weekday}</span>
-                  <span className="text-lg font-semibold tabular-nums">{chip.day}</span>
+                  <span className="text-lg font-semibold tabular-nums">
+                    {chip.day}
+                  </span>
                 </button>
               );
             })}
           </div>
 
-          {availability && <PackageSummaryCard summary={availability.package} />}
+          {availability && (
+            <PackageSummaryCard summary={availability.package} />
+          )}
 
           {loadingSlots && <p className="muted">Uygun saatler hesaplanıyor…</p>}
 
           {!loadingSlots && availability?.message && (
-            <div className="alert alert-warning">
-              <TriangleAlert size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
-              <span>{availability.message}</span>
+            <div
+              role="status"
+              className="flex items-start gap-3 rounded-2xl border border-brass-300 bg-plum-50 p-4 shadow-sm"
+            >
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-plum-100 text-plum-700">
+                <CalendarX size={22} strokeWidth={1.5} aria-hidden />
+              </span>
+              <div>
+                <p className="display text-lg font-semibold text-plum-700">
+                  Bu tarih için uygun saat bulunamadı
+                </p>
+                <p className="mt-1 text-base text-ink-700">
+                  {availability.message}
+                </p>
+              </div>
             </div>
           )}
 
@@ -1193,59 +1392,129 @@ export function BookingFlow({
                 <div className="flex items-center justify-between">
                   <p className="font-medium">{staff.staffName}</p>
                   <span className="muted tabular-nums">
-                    {durationLabel(staff.totalMin)} · {formatTl(staff.totalPrice)}
+                    {durationLabel(staff.totalMin)} ·{" "}
+                    {formatTl(staff.totalPrice)}
                   </span>
                 </div>
 
                 {staff.slots.length === 0 ? (
-                  <p className="mt-2 muted">{staff.diagnostics.reason}</p>
-                ) : (
+                  <p className="mt-2 flex items-start gap-2 text-sm font-medium text-ink-700">
+                    <Info
+                      size={16}
+                      strokeWidth={1.5}
+                      aria-hidden
+                      className="mt-0.5 shrink-0 text-plum-600"
+                    />
+                    <span>{staff.diagnostics.reason}</span>
+                  </p>
+                ) : null}
+
+                {(staff.busySlots?.length ?? 0) > 0 && (
+                  <p className="mt-3 flex items-center gap-4 text-xs font-medium text-ink-600">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        aria-hidden
+                        className="h-2.5 w-2.5 rounded-full bg-success-600/70"
+                      />
+                      Müsait
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        aria-hidden
+                        className="h-2.5 w-2.5 rounded-full bg-danger-600/60"
+                      />
+                      Dolu
+                    </span>
+                  </p>
+                )}
+
+                {staff.slots.length + (staff.busySlots?.length ?? 0) > 0 && (
                   <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
-                    {staff.slots.map((slot) => {
-                      const active =
-                        chosen?.staff.staffId === staff.staffId &&
-                        chosen.slot.startMin === slot.startMin;
-                      return (
-                        <button
-                          key={slot.startMin}
-                          type="button"
-                          onClick={() => void selectSlot(staff, slot)}
-                          aria-pressed={active}
-                          title={slot.heldByYou ? 'Bu saat şu anda senin için tutuluyor' : undefined}
-                          className={`chip chip-primary touch-target h-auto flex-col gap-0 px-1 py-2 ${
-                            active
-                              ? 'chip-active'
-                              : slot.heldByYou
-                                ? 'border-plum-400 bg-plum-50 hover:border-plum-600'
-                                : ''
-                          }`}
-                        >
-                          <span className="font-semibold tabular-nums">{slot.label}</span>
-                          <span
-                            className={`text-[13px] font-medium tabular-nums ${active ? 'text-plum-100' : 'text-ink-500'}`}
-                            aria-label={`bitiş ${slot.endLabel}`}
-                          >
-                            {slot.endLabel}
-                          </span>
-                          <span className="mt-1 flex flex-wrap justify-center gap-0.5">
-                            {slot.heldByYou && (
-                              <span
-                                className={`badge ${active ? 'bg-white/20 text-white' : 'bg-plum-100 text-plum-700'}`}
-                              >
-                                Senin için tutuluyor
+                    {[
+                      ...staff.slots.map((slot) => ({
+                        kind: "free" as const,
+                        startMin: slot.startMin,
+                        slot,
+                      })),
+                      ...(staff.busySlots ?? []).map((b) => ({
+                        kind: "busy" as const,
+                        startMin: b.startMin,
+                        busy: b,
+                      })),
+                    ]
+                      .sort((x, y) => x.startMin - y.startMin)
+                      .map((entry) => {
+                        if (entry.kind === "busy") {
+                          return (
+                            <button
+                              key={`busy-${entry.startMin}`}
+                              type="button"
+                              disabled
+                              aria-disabled="true"
+                              aria-label={`${entry.busy.label} dolu`}
+                              className="chip touch-target h-auto cursor-not-allowed flex-col gap-0 rounded-2xl border-danger-600/25 bg-danger-50 px-1 py-2 text-danger-700/70 opacity-90 hover:border-danger-600/25 hover:bg-danger-50"
+                            >
+                              <span className="font-semibold tabular-nums line-through">
+                                {entry.busy.label}
                               </span>
-                            )}
-                            {slot.isShadowFill && <ShadowBadge />}
-                            <OpportunityBadge
-                              discountRate={slot.discountRate}
-                              label={slot.opportunityLabel}
-                              compact
-                            />
-                            <ViewCountBadge count={slot.viewCount} optIn={engagementOptIn} />
-                          </span>
-                        </button>
-                      );
-                    })}
+                              <span className="text-[13px] font-medium">
+                                Dolu
+                              </span>
+                            </button>
+                          );
+                        }
+                        const slot = entry.slot;
+                        const active =
+                          chosen?.staff.staffId === staff.staffId &&
+                          chosen.slot.startMin === slot.startMin;
+                        return (
+                          <button
+                            key={slot.startMin}
+                            type="button"
+                            onClick={() => void selectSlot(staff, slot)}
+                            aria-pressed={active}
+                            title={
+                              slot.heldByYou
+                                ? "Bu saat şu anda senin için tutuluyor"
+                                : undefined
+                            }
+                            className={`chip chip-primary touch-target h-auto flex-col rounded-2xl gap-0 px-1 py-2 ${
+                              active
+                                ? "chip-active"
+                                : slot.heldByYou
+                                  ? "border-plum-400 bg-plum-50 hover:border-plum-600"
+                                  : "border-success-600/40 bg-success-50 text-success-700 hover:border-success-600 hover:bg-success-50"
+                            }`}
+                          >
+                            <span className="font-semibold tabular-nums">
+                              {slot.label}
+                            </span>
+                            <span
+                              className={`text-[13px] font-medium tabular-nums ${active ? "text-plum-600" : "text-ink-500"}`}
+                              aria-label={`bitiş ${slot.endLabel}`}
+                            >
+                              {slot.endLabel}
+                            </span>
+                            <span className="mt-1 flex flex-wrap justify-center gap-0.5">
+                              {slot.heldByYou && (
+                                <span className="badge bg-plum-100 text-plum-700">
+                                  Senin için tutuluyor
+                                </span>
+                              )}
+                              {slot.isShadowFill && <ShadowBadge />}
+                              <OpportunityBadge
+                                discountRate={slot.discountRate}
+                                label={slot.opportunityLabel}
+                                compact
+                              />
+                              <ViewCountBadge
+                                count={slot.viewCount}
+                                optIn={engagementOptIn}
+                              />
+                            </span>
+                          </button>
+                        );
+                      })}
                   </div>
                 )}
               </div>
@@ -1253,9 +1522,12 @@ export function BookingFlow({
 
           {availability && availability.shadowUpsell.length > 0 && (
             <div className="card border-plum-200 bg-plum-50">
-              <p className="font-medium text-plum-700">Beklerken bunları da yaptırabilirsin</p>
+              <p className="font-medium text-plum-700">
+                Beklerken bunları da yaptırabilirsin
+              </p>
               <p className="muted">
-                Paketinde ustanın serbest kaldığı bir pencere var; bu hizmetler oraya sığıyor.
+                Paketinde personelin serbest kaldığı bir pencere var; bu
+                hizmetler oraya sığıyor.
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {availability.shadowUpsell.map((u) => (
@@ -1277,13 +1549,18 @@ export function BookingFlow({
       {/* ---------- 4) Tasarım görseli ---------- */}
       {step === 4 && lock && (
         <section className="space-y-3">
-          <h1 className="display text-3xl md:text-4xl">İstediğin bir model var mı?</h1>
+          <h1 className="display text-3xl md:text-4xl">
+            İstediğin bir model var mı?
+          </h1>
           <p className="muted">
-            İsteğe bağlı. Bir görsel yükleyebilir veya Pinterest/Instagram bağlantısı
-            yapıştırabilirsin — ustan randevudan önce görür.
+            İsteğe bağlı. Bir görsel yükleyebilir veya Pinterest/Instagram
+            bağlantısı yapıştırabilirsin — personelin randevudan önce görür.
           </p>
 
-          <CountdownBar secondsLeft={secondsLeft} onCancel={() => void releaseLock()} />
+          <CountdownBar
+            secondsLeft={secondsLeft}
+            onCancel={() => void releaseLock()}
+          />
 
           <div className="card space-y-3">
             <div>
@@ -1298,11 +1575,15 @@ export function BookingFlow({
                 className="field"
               />
               <p className="mt-1 muted">JPG, PNG veya WEBP · en fazla 8 MB</p>
-              {designFile && <p className="mt-1 text-sm text-ink-700">Seçili: {designFile.name}</p>}
+              {designFile && (
+                <p className="mt-1 text-sm text-ink-700">
+                  Seçili: {designFile.name}
+                </p>
+              )}
               {lostDesignFile && !designFile && (
                 <p className="mt-1 text-sm text-warning-600">
-                  Giriş sırasında seçtiğin görsel korunamadı (tarayıcı dosyaları saklayamaz).
-                  İstersen yeniden ekleyebilirsin.
+                  Giriş sırasında seçtiğin görsel korunamadı (tarayıcı dosyaları
+                  saklayamaz). İstersen yeniden ekleyebilirsin.
                 </p>
               )}
             </div>
@@ -1323,7 +1604,7 @@ export function BookingFlow({
 
             <div>
               <label className="label" htmlFor="notes">
-                Ustaya not (isteğe bağlı)
+                Personele not (isteğe bağlı)
               </label>
               <textarea
                 id="notes"
@@ -1342,70 +1623,130 @@ export function BookingFlow({
       {step === 5 && lock && chosen && (
         <section className="space-y-3">
           <h1 className="display text-3xl md:text-4xl">Son kontrol</h1>
-          <CountdownBar secondsLeft={secondsLeft} onCancel={() => void releaseLock()} />
+          <CountdownBar
+            secondsLeft={secondsLeft}
+            onCancel={() => void releaseLock()}
+          />
 
-          {member && memberName && mode === 'self' && <NameEditor firstName={memberName} />}
+          {member && memberName && mode === "self" && (
+            <NameEditor firstName={memberName} />
+          )}
 
           <div className="card space-y-2">
-            {mode === 'other' && <Row label="Kimin için" value={recipientName.trim()} />}
-            <Row label="Tarih" value={new Date(`${date}T00:00:00`).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })} />
+            {mode === "other" && (
+              <Row label="Kimin için" value={recipientName.trim()} />
+            )}
+            <Row
+              label="Tarih"
+              value={new Date(`${date}T00:00:00`).toLocaleDateString("tr-TR", {
+                day: "numeric",
+                month: "long",
+                weekday: "long",
+              })}
+            />
             <Row label="Saat" value={`${lock.startLabel} – ${lock.endLabel}`} />
-            <Row label="Usta" value={chosen.staff.staffName} />
-            <Row label="Hizmetler" value={selectedServices.map((s) => s.name).join(' + ')} />
+            <Row label="Personel" value={chosen.staff.staffName} />
+            <Row
+              label="Hizmetler"
+              value={selectedServices.map((s) => s.name).join(" + ")}
+            />
             <Row label="Toplam süre" value={durationLabel(lock.totalMin)} />
             {(notes || designLink || designFile) && (
               <Row
-                label="Ustaya iletilecek"
+                label="Personele iletilecek"
                 value={[
-                  designFile ? 'görsel' : null,
-                  designLink ? 'bağlantı' : null,
-                  notes ? 'not' : null,
+                  designFile ? "görsel" : null,
+                  designLink ? "bağlantı" : null,
+                  notes ? "not" : null,
                 ]
                   .filter(Boolean)
-                  .join(', ')}
+                  .join(", ")}
               />
             )}
             <Row label="Tutar" value={formatTl(lock.totalPrice)} />
-            {chosen.slot.discountRate > 0 && (
+            {(lock.discountRate ?? chosen.slot.discountRate) > 0 && (
               <Row
                 label="Fırsat indirimi"
-                value={`%${Math.round(chosen.slot.discountRate * 100)} — ${formatTl(lock.totalPrice * (1 - chosen.slot.discountRate))}`}
+                value={`%${Math.round((lock.discountRate ?? chosen.slot.discountRate) * 100)} — ${formatTl(
+                  lock.discountedPrice ??
+                    lock.totalPrice * (1 - chosen.slot.discountRate),
+                )}`}
               />
             )}
             {lock.savedMin > 0 && (
               <p className="alert alert-success">
-                <CircleCheck size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
-                <span>Sıkıştırma sayesinde {lock.savedMin} dakika kazandın.</span>
+                <CircleCheck
+                  size={18}
+                  strokeWidth={1.5}
+                  aria-hidden
+                  className="mt-0.5 shrink-0"
+                />
+                <span>
+                  Sıkıştırma sayesinde {lock.savedMin} dakika kazandın.
+                </span>
               </p>
             )}
             {chosen.slot.isShadowFill && (
               <p className="rounded-[2px] bg-plum-50 px-3 py-2 text-sm text-plum-700">
-                Bu saat, ustanın başka bir işlemde beklediği süreye denk geliyor. Salon için
-                verimli, senin için erken bir saat.
+                Bu saat, personelin başka bir işlemde beklediği süreye denk
+                geliyor. Salon için verimli, senin için erken bir saat.
               </p>
             )}
           </div>
 
           {lostDesignFile && !designFile && (
             <div className="alert alert-warning">
-              <TriangleAlert size={18} strokeWidth={1.5} aria-hidden className="mt-0.5 shrink-0" />
+              <TriangleAlert
+                size={18}
+                strokeWidth={1.5}
+                aria-hidden
+                className="mt-0.5 shrink-0"
+              />
               <div>
-                Giriş sırasında seçtiğin görsel korunamadı.{' '}
+                Giriş sırasında seçtiğin görsel korunamadı.{" "}
                 <button
                   type="button"
                   className="font-semibold underline"
                   onClick={() => void goToStep(4)}
                 >
                   Görseli yeniden ekle
-                </button>{' '}
+                </button>{" "}
                 (tuttuğun saat korunur).
               </div>
             </div>
           )}
 
-          {mode === 'other' && (
-            <p className="muted">{recipientName.trim()} kişisine WhatsApp ile bilgi gönderilecek.</p>
+          {mode === "other" && (
+            <p className="muted">
+              {recipientName.trim()} kişisine WhatsApp ile bilgi gönderilecek.
+            </p>
           )}
+
+          {lock.deposit?.enabled && lock.deposit.amount ? (
+            <div className="space-y-1.5 rounded-2xl border border-brass-300 bg-brass-300/15 p-4 text-sm">
+              <p className="font-semibold text-brass-700">
+                Kapora: {formatTl(lock.deposit.amount)}
+              </p>
+              <p className="text-ink-700">
+                Randevunuz, kapora havalesi ulaşınca kesinleşir. Havale bilgilerini bir sonraki ekranda ve
+                WhatsApp&apos;ta göreceksiniz.
+              </p>
+              <p className="text-xs text-ink-700">{lock.deposit.policy}</p>
+            </div>
+          ) : null}
+
+          <div className="card">
+            <h2 className="text-base font-semibold text-ink-900">Onaylar</h2>
+            <RequiredConsents
+              privacyAck={privacyAck}
+              onPrivacyAck={setPrivacyAck}
+              healthDecl={healthDecl}
+              onHealthDecl={setHealthDecl}
+            />
+            {mode === "self" && (
+              <AllergyOptIn value={allergy} onChange={setAllergy} />
+            )}
+          </div>
 
           {!member && (
             <div className="card">
@@ -1426,10 +1767,12 @@ export function BookingFlow({
           <div className="mb-2 flex items-center justify-between text-sm">
             <span className="muted">
               {selectedIds.length === 0
-                ? 'Hizmet seçilmedi'
-                : `${selectedIds.length} hizmet · ${barTotal.approx ? 'yaklaşık ' : ''}${durationLabel(barTotal.min)}`}
+                ? "Hizmet seçilmedi"
+                : `${selectedIds.length} hizmet · ${barTotal.approx ? "yaklaşık " : ""}${durationLabel(barTotal.min)}`}
             </span>
-            <span className="font-semibold tabular-nums">{formatTl(barTotal.price)}</span>
+            <span className="font-semibold tabular-nums">
+              {formatTl(barTotal.price)}
+            </span>
           </div>
 
           <div className="flex gap-2">
@@ -1449,7 +1792,8 @@ export function BookingFlow({
                 type="button"
                 className="btn-primary flex-1"
                 disabled={
-                  selectedIds.length === 0 || (mode === 'other' && (!member || !recipientValid))
+                  selectedIds.length === 0 ||
+                  (mode === "other" && (!member || !recipientValid))
                 }
                 onClick={() => setStep(2)}
               >
@@ -1457,7 +1801,11 @@ export function BookingFlow({
               </button>
             )}
             {step === 2 && (
-              <button type="button" className="btn-primary flex-1" onClick={() => setStep(3)}>
+              <button
+                type="button"
+                className="btn-primary flex-1"
+                onClick={() => setStep(3)}
+              >
                 Saatleri gör
               </button>
             )}
@@ -1468,11 +1816,15 @@ export function BookingFlow({
                 disabled={!chosen || busy}
                 onClick={() => void acquireLock()}
               >
-                {busy ? 'Rezerve ediliyor…' : 'Bu saati tut'}
+                {busy ? "Rezerve ediliyor…" : "Bu saati tut"}
               </button>
             )}
             {step === 4 && (
-              <button type="button" className="btn-primary flex-1" onClick={() => setStep(5)}>
+              <button
+                type="button"
+                className="btn-primary flex-1"
+                onClick={() => setStep(5)}
+              >
                 Özete geç
               </button>
             )}
@@ -1480,10 +1832,16 @@ export function BookingFlow({
               <button
                 type="button"
                 className="btn-primary flex-1"
-                disabled={busy || !member}
+                disabled={busy || !member || !privacyAck || !healthDecl}
                 onClick={() => void confirm()}
               >
-                {busy ? 'Onaylanıyor…' : member ? 'Randevuyu onayla' : 'Önce numaranı doğrula'}
+                {busy
+                  ? "Onaylanıyor…"
+                  : !member
+                    ? "Önce numaranı doğrula"
+                    : !privacyAck || !healthDecl
+                      ? "Onayları işaretle"
+                      : "Randevuyu onayla"}
               </button>
             )}
           </div>
@@ -1501,31 +1859,31 @@ function Stepper({ step, onJump }: { step: Step; onJump: (s: Step) => void }) {
   return (
     <ol className="flex items-start gap-3">
       {STEPS.map((s) => {
-        const state = s.id === step ? 'current' : s.id < step ? 'done' : 'todo';
+        const state = s.id === step ? "current" : s.id < step ? "done" : "todo";
         return (
           <li key={s.id} className="flex-1">
             <button
               type="button"
               onClick={() => onJump(s.id)}
-              disabled={state === 'todo'}
+              disabled={state === "todo"}
               className="w-full text-left"
             >
               <div
-                className={`${state === 'current' ? 'h-0.5' : 'h-px'} ${
-                  state === 'todo' ? 'bg-sand-300' : 'bg-plum-600'
+                className={`${state === "current" ? "h-0.5" : "h-px"} ${
+                  state === "todo" ? "bg-sand-300" : "bg-plum-600"
                 }`}
               />
               <span
                 className={`mt-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase ${
-                  state === 'current'
-                    ? 'text-ink-900'
-                    : state === 'done'
-                      ? 'text-plum-600'
-                      : 'text-ink-400'
+                  state === "current"
+                    ? "text-ink-900"
+                    : state === "done"
+                      ? "text-plum-600"
+                      : "text-ink-400"
                 }`}
-                style={{ letterSpacing: '0.12em' }}
+                style={{ letterSpacing: "0.12em" }}
               >
-                {state === 'done' ? (
+                {state === "done" ? (
                   <Check size={12} strokeWidth={2} aria-hidden />
                 ) : (
                   <span className="tabular-nums" aria-hidden>
@@ -1542,82 +1900,47 @@ function Stepper({ step, onJump }: { step: Step; onJump: (s: Step) => void }) {
   );
 }
 
-/**
- * Paketin zaman çizelgesi. Aktif dilimler dolu, pasif (bekleme)
- * dilimler ÇİZGİLİ gösterilir — müşteri "bu 40 dakika beklemem" ile
- * "usta bu 40 dakikada başkasıyla ilgilenebilir"i aynı anda görür.
- */
+/** Paket özeti: yalnızca toplam süre ve tutar. */
 function PackageSummaryCard({
   summary,
 }: {
-  summary: AvailabilityResponse['package'];
+  summary: AvailabilityResponse["package"];
 }) {
   if (summary.totalMin === 0) return null;
 
   return (
-    <div className="card">
-      <div className="flex items-baseline justify-between">
-        <p className="font-medium">
-          Toplam {summary.isNominal ? 'yaklaşık ' : ''}
-          {durationLabel(summary.totalMin)}
-        </p>
-        <p className="font-semibold tabular-nums">{formatTl(summary.totalPrice)}</p>
-      </div>
-
-      {summary.isNominal && (
-        <p className="mt-1 muted">
-          Usta seçmediğin için süre ortalama hıza göre hesaplandı; kesin süre her ustanın
-          yanında yazıyor.
-        </p>
-      )}
-
-      {summary.savedMin > 0 && (
-        <p className="mt-1 text-sm text-success-700">
-          Sıkıştırma ile {summary.savedMin} dakika kazanç — hizmetler birbirinin bekleme
-          süresine yerleşti.
-        </p>
-      )}
-
-      <div className="mt-3 flex h-8 w-full overflow-hidden rounded-[2px] border border-sand-200">
-        {summary.items.map((item) => {
-          const seg = (min: number) => `${(min / summary.totalMin) * 100}%`;
-          return (
-            <div key={`${item.serviceId}-${item.offsetMin}`} className="contents">
-              {item.activeBeforeMin > 0 && (
-                <div
-                  className="bg-plum-500"
-                  style={{ width: seg(item.activeBeforeMin) }}
-                  title={`${item.name} — usta meşgul (${item.activeBeforeMin} dk)`}
-                />
-              )}
-              {item.passiveMin > 0 && (
-                <div
-                  className="shadow-window"
-                  style={{ width: seg(item.passiveMin) }}
-                  title={`${item.name} — bekleme, usta serbest (${item.passiveMin} dk)`}
-                />
-              )}
-              {item.activeAfterMin > 0 && (
-                <div
-                  className="bg-plum-500"
-                  style={{ width: seg(item.activeAfterMin) }}
-                  title={`${item.name} — usta meşgul (${item.activeAfterMin} dk)`}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="mt-2 flex gap-3 text-xs text-ink-500">
-        <span className="flex items-center gap-1">
-          <span className="inline-block h-2.5 w-4 rounded-[2px] bg-plum-500" /> usta meşgul
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="shadow-window inline-block h-2.5 w-4 rounded-[2px]" /> bekleme (usta serbest)
-        </span>
-      </div>
+    <div className="card flex items-baseline justify-between">
+      <p className="font-medium">
+        Toplam {summary.isNominal ? "yaklaşık " : ""}
+        {durationLabel(summary.totalMin)}
+      </p>
+      <p className="font-semibold tabular-nums">
+        {formatTl(summary.totalPrice)}
+      </p>
     </div>
+  );
+}
+
+/** Adım 2–5 üstündeki belirgin geri bağlantısı (kilit bırakmayı goToStep halleder). */
+function BackLink({
+  label,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="btn-link -mb-1 inline-flex items-center gap-1 disabled:opacity-50"
+    >
+      <ChevronLeft size={18} strokeWidth={1.75} aria-hidden />
+      Önceki adım{label ? ` · ${label}` : ""}
+    </button>
   );
 }
 
@@ -1638,13 +1961,15 @@ function StaffPicker({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/catalog/staff?serviceIds=${serviceIds.join(',')}`, { cache: 'no-store' })
+    fetch(`/api/catalog/staff?serviceIds=${serviceIds.join(",")}`, {
+      cache: "no-store",
+    })
       .then((r) => r.json())
       .then((body) => {
         if (cancelled || !body.ok) return;
         const list = body.data.staff as { id: number }[];
         setStaff(body.data.staff);
-        // Hizmetler değişti ve seçili usta artık hepsini yapamıyor:
+        // Hizmetler değişti ve seçili personel artık hepsini yapamıyor:
         // seçimi "Farketmez"e çek, aksi halde 3. adımda hiç saat çıkmaz.
         if (value !== null && !list.some((s) => s.id === value)) onChange(null);
       })
@@ -1658,10 +1983,9 @@ function StaffPicker({
 
   return (
     <section className="space-y-3">
-      <h1 className="display text-3xl md:text-4xl">Kiminle çalışmak istersin?</h1>
-      <p className="muted">
-        Yalnızca seçtiğin hizmetlerin <strong>tamamını</strong> yapabilen ustalar listelenir.
-      </p>
+      <h1 className="display text-3xl md:text-4xl">
+        Kiminle çalışmak istersin?
+      </h1>
 
       {loading && <p className="muted">Yükleniyor…</p>}
 
@@ -1669,10 +1993,9 @@ function StaffPicker({
         <button
           type="button"
           onClick={() => onChange(null)}
-          className={`card text-left ${value === null ? 'border-plum-600 bg-plum-50' : 'hover:border-ink-300'}`}
+          className={`card text-left ${value === null ? "border-plum-400 bg-plum-50 ring-1 ring-plum-300" : "hover:border-plum-200 hover:bg-plum-50/40"}`}
         >
           <p className="font-medium">Farketmez</p>
-          <p className="muted">En uygun saatleri bulmak için tüm ustalar taranır.</p>
         </button>
 
         {staff.map((s) => (
@@ -1681,12 +2004,18 @@ function StaffPicker({
             type="button"
             onClick={() => onChange(s.id)}
             className={`card flex items-center gap-3 text-left ${
-              value === s.id ? 'border-plum-600 bg-plum-50' : 'hover:border-ink-300'
+              value === s.id
+                ? "border-plum-400 bg-plum-50 ring-1 ring-plum-300"
+                : "hover:border-plum-200 hover:bg-plum-50/40"
             }`}
           >
             {s.photoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={s.photoUrl} alt="" className="h-12 w-12 rounded-full object-cover" />
+              <img
+                src={s.photoUrl}
+                alt=""
+                className="h-12 w-12 rounded-full object-cover"
+              />
             ) : (
               <span className="grid h-12 w-12 place-items-center rounded-full bg-sand-200">
                 {s.name[0]}
@@ -1694,7 +2023,9 @@ function StaffPicker({
             )}
             <div>
               <p className="font-medium">{s.name}</p>
-              {s.speedFactor < 1 && <p className="muted">Bu işi ortalamadan hızlı tamamlıyor</p>}
+              {s.speedFactor < 1 && (
+                <p className="muted">Bu işi ortalamadan hızlı tamamlıyor</p>
+              )}
             </div>
           </button>
         ))}
@@ -1719,14 +2050,14 @@ function CountdownBar({
     <div
       className={`flex items-center justify-between rounded-[2px] border px-4 py-3 text-sm ${
         urgent
-          ? 'border-danger-600/30 bg-danger-50 text-danger-700'
-          : 'border-plum-200 bg-plum-50 text-plum-700'
+          ? "border-danger-600/30 bg-danger-50 text-danger-700"
+          : "border-plum-200 bg-plum-50 text-plum-700"
       }`}
     >
       <span>
-        Bu saat senin için tutuldu ·{' '}
+        Bu saat senin için tutuldu ·{" "}
         <strong className="tabular-nums">
-          {minutes}:{String(seconds).padStart(2, '0')}
+          {minutes}:{String(seconds).padStart(2, "0")}
         </strong>
       </span>
       <button type="button" onClick={onCancel} className="btn-link">

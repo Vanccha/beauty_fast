@@ -17,9 +17,14 @@ import { ApiError, apiSend } from '@/lib/api-client';
 export function AppointmentActions({
   appointmentId,
   version,
+  cancelLocked = false,
+  cancelLockedMessage,
 }: {
   appointmentId: number;
   version: number;
+  /** Randevuya 60 dakikadan az kaldı: iptal kapalı (kapora iade edilmez). */
+  cancelLocked?: boolean;
+  cancelLockedMessage?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -58,7 +63,11 @@ export function AppointmentActions({
         </div>
       )}
 
-      {confirming ? (
+      {cancelLocked ? (
+        <p className="rounded-xl bg-sand-100 px-3 py-2 text-sm text-ink-700">
+          {cancelLockedMessage ?? 'Randevuya 1 saatten az kaldığı için iptal edilemez. Kapora iade edilmez.'}
+        </p>
+      ) : confirming ? (
         <div className="flex gap-2">
           <button type="button" className="btn-secondary btn-sm flex-1" onClick={() => setConfirming(false)}>
             Vazgeç

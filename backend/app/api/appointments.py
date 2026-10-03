@@ -15,7 +15,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
 from ..auth.sessions import read_visitor_key
-from ..core.opportunity import OccupancySample, score_opportunity
+from ..core.opportunity import fixed_window_discount, window_label
 from ..core.package_layout import LayoutOptions, layout_package
 from ..core.reminder_rules import resolve_pre_reminder
 from ..deps import AnyPrincipalDep, CustomerDep, DbSession
@@ -25,15 +25,18 @@ from ..models import (
     Allergy,
     Appointment,
     AppointmentItem,
+    Customer,
     DesignReference,
-    OccupancyStat,
     Review,
     ScheduledNotification,
     Staff,
 )
 from ..services import notification_worker
 from ..services.appointment import confirm_appointment_from_lock
+from ..services import push
 from ..services.appointment_status import change_appointment_status
+from ..services import deposit
+from ..services.booking_cancellation import queue_group_cancellation_notices
 from ..services.booking_for_other import (
     BeneficiaryBody,
     build_beneficiary_message,
@@ -51,6 +54,7 @@ from ..services.booking_confirmation import (
     queue_confirmation,
 )
 from ..services.catalog import (
+    get_discount_settings,
     assert_staff_can_do,
     get_default_branch,
     get_exclusive_resource_ids,
@@ -61,6 +65,26 @@ from ..time_utils import format_date_tr, is_date_key, minutes_to_label, now_loca
 from ..uploads import sanitize_external_link, store_upload
 
 router = APIRouter(prefix="/api/appointments", tags=["appointments"], route_class=EnvelopeRoute)
+
+
+class AllergyInput(BaseModel):
+    """Istege bagli alerji bilgisi (ozel nitelikli saglik verisi; acik riza ister)."""
+
+    label: str = Field(min_length=1, max_length=120)
+    note: str | None = Field(default=None, max_length=500)
+
+    @field_validator("label")
+    @classmethod
+    def _strip_label(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Alerji adı boş olamaz.")
+        return v
+
+    @field_validator("note")
+    @classmethod
+    def _strip_note(cls, v: str | None) -> str | None:
+        return (v.strip() or None) if v is not None else None
 
 
 class CreateAppointmentBody(BaseModel):
@@ -75,6 +99,14 @@ class CreateAppointmentBody(BaseModel):
     designLink: str | None = None
     #: Baskasi adina randevu: randevunun sahibi (ad + telefon).
     beneficiary: BeneficiaryBody | None = None
+    #: KVKK Aydinlatma Metni "okudum" teyidi (zorunlu; riza degildir).
+    privacyNoticeAck: bool = False
+    #: Saglik beyani onay kutusu (zorunlu; saglik verisi icermez).
+    healthDeclaration: bool = False
+    #: Istege bagli alerji kaydi; yalnizca ``healthConsent`` ile ve kendi adina.
+    allergy: AllergyInput | None = None
+    #: Alerji icin AYRI, istege bagli acik riza (KVKK m.6). Randevu buna bagli degildir.
+    healthConsent: bool = False
 
     @field_validator("date")
     @classmethod
@@ -98,6 +130,33 @@ def create_appointment(
     UYELIK SARTI: misafirler katalogu ve slotlari gorebilir, randevu icin
     ``require_customer`` gecilmelidir (``MEMBERSHIP_REQUIRED``).
     """
+    # --- KVKK: zorunlu onaylar, kilit/kayit islemlerinden ONCE ------------
+    if not body.privacyNoticeAck:
+        raise AppError(
+            "PRIVACY_NOTICE_REQUIRED",
+            "Devam etmek için Aydınlatma Metni'ni okuduğunuzu onaylamalısınız.",
+            400,
+        )
+    if not body.healthDeclaration:
+        raise AppError(
+            "HEALTH_DECLARATION_REQUIRED",
+            "Devam etmek için sağlık beyanını onaylamalısınız.",
+            400,
+        )
+    if body.allergy is not None:
+        if not is_self(customer.phone, body.beneficiary):
+            raise AppError(
+                "VALIDATION",
+                "Başkası adına alınan randevuda alerji bilgisi eklenemez; kişinin kendisi salona bildirebilir.",
+                400,
+            )
+        if not body.healthConsent:
+            raise AppError(
+                "CONSENT_REQUIRED",
+                "Alerji bilginizi kaydetmek için açık rızanız gerekir. Rıza vermeden de randevu alabilirsiniz.",
+                400,
+            )
+
     validate_service_ids(body.serviceIds)
     branch = get_default_branch(db)
 
@@ -112,23 +171,10 @@ def create_appointment(
     specs = load_service_specs(db, body.serviceIds)
     layout = layout_package(specs, LayoutOptions(speed_factor=speed_factor))
 
-    # --- Firsat saati indirimi: yine SUNUCUDA ---------------------------
-    weekday = weekday_of(body.date)
-    hour_bucket = (body.startMin // 60) * 60
-    stat = db.scalar(
-        select(OccupancyStat).where(
-            OccupancyStat.branch_id == branch.id,
-            OccupancyStat.weekday == weekday,
-            OccupancyStat.slot_min == hour_bucket,
-        )
-    )
-    opportunity = score_opportunity(
-        OccupancySample(
-            weekday=weekday,
-            slot_min=hour_bucket,
-            occupancy=stat.occupancy if stat else 0.5,
-            sample_size=stat.sample_size if stat else 0,
-        )
+    # --- Firsat saati indirimi: yine SUNUCUDA (istemci orani yok sayilir) --
+    # Onay anindaki ayarlarla yeniden hesaplanir; yanit bu degeri tasir.
+    discount_rate = fixed_window_discount(
+        body.date, body.startMin, get_discount_settings(db)
     )
 
     # --- Golge (shadow) ebeveyni: istemciye korlemesine guvenilmez --------
@@ -159,6 +205,22 @@ def create_appointment(
         owner = find_or_create_beneficiary(db, body.beneficiary)
         owner_id, owner_name, owner_phone = owner.id, owner.first_name, owner.phone
 
+    # --- Alerji kaydi (acik riza ile; randevuyla AYNI transaction) -------
+    now = now_local()
+    if body.allergy is not None and not for_other:
+        row = db.get(Customer, customer.id)
+        if row is not None and row.health_consent_at is None:
+            row.health_consent_at = now
+        db.add(
+            Allergy(
+                customer_id=customer.id,
+                label=body.allergy.label,
+                note=body.allergy.note,
+                severity="HIGH",
+            )
+        )
+        db.flush()
+
     # --- Alerji ikazi ---------------------------------------------------
     # Baskasi adina randevuda alicinin saglik verisi alana GOSTERILMEZ.
     allergies = (
@@ -167,6 +229,7 @@ def create_appointment(
         else db.scalars(select(Allergy).where(Allergy.customer_id == customer.id)).all()
     )
 
+    deposit_settings = deposit.load_settings(db)
     appointment = confirm_appointment_from_lock(
         db,
         lock_id=body.lockId,
@@ -180,10 +243,13 @@ def create_appointment(
         start_min=body.startMin,
         layout=layout,
         exclusive_resource_ids=get_exclusive_resource_ids(db, branch.id),
-        discount_rate=opportunity.discount_rate,
-        is_opportunity=opportunity.is_opportunity,
+        discount_rate=discount_rate,
+        is_opportunity=discount_rate > 0,
         notes=body.notes,
         shadow_parent_id=shadow_parent_id,
+        privacy_notice_ack_at=now,
+        health_declaration_at=now,
+        deposit_settings=deposit_settings,
         design_refs=(
             [{"source": "LINK", "url": sanitize_external_link(body.designLink)}]
             if body.designLink
@@ -218,26 +284,35 @@ def create_appointment(
             db.commit()
 
     # --- Randevuyu alana onay mesaji (kuyruk + isciyi uyandir) -----------
+    # Kapora aciksa normal onay mesajinin YERINE kapora talebi gider
+    # (randevu PENDING + AWAITING; havale onaylaninca kesinlesir).
     staff = db.get(Staff, body.staffId)
-    queue_confirmation(
-        db,
-        customer.id,
-        f"{CONFIRM_PREFIX}{appointment.id}",
-        build_confirmation_message(
-            customer.first_name,
-            [
-                ConfirmationLine(
-                    date=body.date,
-                    start_min=body.startMin,
-                    service_names=[s.name for s in specs],
-                    staff_name=staff.name if staff else "",
-                    for_name=body.beneficiary.firstName if for_other else None,
-                )
-            ],
-        ),
-    )
+    if appointment.deposit_status == deposit.AWAITING:
+        deposit.queue_deposit_request(
+            db, [appointment], db.get(Customer, customer.id), deposit_settings
+        )
+    else:
+        queue_confirmation(
+            db,
+            customer.id,
+            f"{CONFIRM_PREFIX}{appointment.id}",
+            build_confirmation_message(
+                customer.first_name,
+                [
+                    ConfirmationLine(
+                        date=body.date,
+                        start_min=body.startMin,
+                        service_names=[s.name for s in specs],
+                        staff_name=staff.name if staff else "",
+                        for_name=body.beneficiary.firstName if for_other else None,
+                    )
+                ],
+            ),
+        )
     db.commit()
     notification_worker.kick()
+    # Panel cihazlarina Web Push (arka planda, hata istegi bozmaz).
+    push.notify_new_appointments([appointment.id])
 
     # --- Baskasi adina: sayac + aliciya bilgilendirme (commit SONRASI) ---
     if for_other:
@@ -273,11 +348,14 @@ def create_appointment(
             "discountRate": appointment.discount_rate,
             "isOpportunity": appointment.is_opportunity,
             "version": appointment.version,
+            "status": appointment.status,
         },
+        #: Kapora bekleniyorsa odeme bilgileri (yalnizca randevuyu alana doner)
+        "deposit": deposit.customer_view(db, appointment, deposit_settings, True),
         "opportunity": {
-            "discountRate": opportunity.discount_rate,
-            "label": opportunity.label,
-            "saved": round(layout.total_price * opportunity.discount_rate, 2),
+            "discountRate": discount_rate,
+            "label": window_label(discount_rate),
+            "saved": round(layout.total_price * discount_rate, 2),
         },
         #: Randevu ekraninda KIRMIZI kutuda gosterilir
         "allergyWarnings": [
@@ -296,7 +374,9 @@ def my_appointments(customer: CustomerDep, db: DbSession) -> dict:
     yalnizca ``customer_id = kendisi`` olanlari gorur; alan kisinin
     randevulari ona gorunmez. Gizli usta notlari bu uca HIC dahil edilmez.
     """
-    today_key = to_date_key(now_local())
+    now = now_local()
+    today_key = to_date_key(now)
+    deposit_settings = deposit.load_settings(db)
 
     rows = db.scalars(
         select(Appointment)
@@ -343,8 +423,19 @@ def my_appointments(customer: CustomerDep, db: DbSession) -> dict:
             "designRefs": [
                 {"id": d.id, "source": d.source, "url": d.url} for d in a.design_refs
             ],
-            #: Musteri iptal edebilir mi? (gecmis ve tamamlanmislar haric)
-            "cancellable": a.date >= today_key and a.status in ("PENDING", "CONFIRMED"),
+            #: Musteri iptal edebilir mi? (gecmis, tamamlanmis ve randevuya
+            #: 60 dakikadan az kalanlar haric)
+            "cancellable": a.date >= today_key
+            and a.status in ("PENDING", "CONFIRMED")
+            and not deposit.customer_cancel_locked(a, now),
+            #: Randevuya 60 dakikadan az kaldi: iptal kapali (kapora iade edilmez)
+            "cancelLocked": a.status in ("PENDING", "CONFIRMED")
+            and deposit.customer_cancel_locked(a, now),
+            "cancelLockedMessage": deposit.CANCEL_TOO_LATE_MESSAGE,
+            #: Kapora (yalnizca randevuyu alan odeme bilgisini gorur)
+            "deposit": deposit.customer_view(
+                db, a, deposit_settings, a.booked_by_customer_id == customer.id
+            ),
             #: Bu randevuya yorum yazilmis mi? (randevu basina tek yorum)
             "hasReview": a.id in reviewed,
             #: Randevunun sahibi (baskasi adina alindiysa alici)
@@ -415,6 +506,16 @@ def appointment_detail(
         "isMine": principal.kind == "customer"
         and appointment.customer_id == principal.customer.id,
         "groupId": appointment.booking_group_id,
+        "deposit": (
+            deposit.admin_view(appointment, deposit.load_settings(db), now_local())
+            if principal.kind == "staff"
+            else deposit.customer_view(
+                db,
+                appointment,
+                deposit.load_settings(db),
+                appointment.booked_by_customer_id == principal.customer.id,
+            )
+        ),
         "id": appointment.id,
         "date": appointment.date,
         "dateLabel": format_date_tr(appointment.date),
@@ -502,6 +603,9 @@ def patch_appointment(
             raise AppError(
                 "FORBIDDEN", "Randevu durumunu yalnızca salon güncelleyebilir.", 403
             )
+        # Randevuya 60 dakikadan az kala iptal yok (kapora olsun olmasin).
+        if appointment.status in ("PENDING", "CONFIRMED"):
+            deposit.assert_customer_may_cancel(appointment)
 
     return change_appointment_status(
         db,
@@ -528,8 +632,38 @@ def cancel_group(group_id: str, customer: CustomerDep, db: DbSession) -> dict:
         raise AppError("NOT_FOUND", "Grup randevusu bulunamadı.", 404)
 
     ids = [a.id for a in rows if a.status in ("PENDING", "CONFIRMED")]
+    now = now_local()
+    if any(deposit.customer_cancel_locked(a, now) for a in rows if a.id in ids):
+        raise AppError("CANCEL_TOO_LATE", deposit.CANCEL_TOO_LATE_MESSAGE, 409)
+    # Tek tek mesaj yerine alana TEK ozet + her aliciya ayri mesaj (asagida).
     for appointment_id in ids:
-        change_appointment_status(db, appointment_id=appointment_id, status="CANCELLED")
+        change_appointment_status(
+            db, appointment_id=appointment_id, status="CANCELLED", notify=False
+        )
+    if ids:
+        cancelled = db.scalars(
+            select(Appointment)
+            .options(
+                selectinload(Appointment.items).selectinload(AppointmentItem.service),
+                selectinload(Appointment.customer),
+            )
+            .where(Appointment.id.in_(ids))
+            .order_by(Appointment.start_min, Appointment.id)
+        ).all()
+        refunds = db.scalar(
+            select(Appointment.id)
+            .where(Appointment.id.in_(ids), Appointment.deposit_status == deposit.REFUND_DUE)
+            .limit(1)
+        )
+        queue_group_cancellation_notices(
+            db,
+            db.get(Customer, customer.id),
+            group_id,
+            list(cancelled),
+            refund_note=refunds is not None,
+        )
+        db.commit()
+        notification_worker.kick()
     return {"groupId": group_id, "cancelled": len(ids)}
 
 

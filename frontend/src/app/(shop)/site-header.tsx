@@ -91,7 +91,7 @@ export function SiteHeader({
           <Link
             href="/randevularim"
             aria-label="Randevu Sorgula"
-            className={`touch-target inline-flex items-center justify-center gap-2 rounded-[2px] px-3 text-xs font-semibold uppercase tracking-[0.14em] whitespace-nowrap transition-colors ${
+            className={`touch-target inline-flex items-center justify-center gap-2 rounded-full px-3 text-xs font-semibold uppercase tracking-[0.14em] whitespace-nowrap transition-colors ${
               transparent ? 'text-white hover:bg-white/15' : 'text-ink-700 hover:bg-sand-100'
             }`}
           >

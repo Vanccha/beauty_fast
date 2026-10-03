@@ -34,12 +34,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import admin, appointments, auth, catalog, group_booking, privacy, public, slots, webhooks
+from .api import (
+    admin,
+    appointments,
+    auth,
+    catalog,
+    group_booking,
+    privacy,
+    public,
+    push,
+    slots,
+    webhooks,
+)
 from .config import config, validate_config
 from .db import init_db
 from .errors import AppError
 from .http import app_error_handler, unexpected_error_handler, validation_error_handler
-from .services import messaging, notification_worker
+from .services import deposit_watch, messaging, notification_worker, whatsapp_health
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("aurora")
@@ -74,7 +85,13 @@ async def lifespan(application: FastAPI):
     application.mount("/uploads", StaticFiles(directory=config.upload_dir), name="uploads")
     # Bildirim kuyrugu (hatirlatmalar, randevu onaylari) uygulama icinde bosaltilir.
     worker = notification_worker.start()
+    # WhatsApp baglanti nobetcisi (kopunca yoneticilere Web Push).
+    health = whatsapp_health.start()
+    # Kapora nobetcisi (gecikme / iade hatirlatmasi -> yoneticilere Web Push).
+    deposits = deposit_watch.start()
     yield
+    await deposit_watch.stop(deposits)
+    await whatsapp_health.stop(health)
     await notification_worker.stop(worker)
 
 
@@ -118,6 +135,7 @@ app.include_router(slots.router)
 app.include_router(group_booking.router)
 app.include_router(appointments.router)
 app.include_router(admin.router)
+app.include_router(push.router)
 app.include_router(webhooks.router)
 
 

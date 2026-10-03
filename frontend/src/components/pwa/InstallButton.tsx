@@ -58,7 +58,7 @@ export function SiteInstallButton({ transparent }: { transparent: boolean }) {
         onClick={onClick}
         aria-label="Uygulamayı yükle"
         aria-expanded={canInstall ? undefined : helpOpen}
-        className={`touch-target inline-flex items-center justify-center gap-2 rounded-[2px] px-2.5 text-xs font-semibold uppercase tracking-[0.14em] transition-colors md:px-3 ${
+        className={`touch-target inline-flex items-center justify-center gap-2 rounded-full px-2.5 text-xs font-semibold uppercase tracking-[0.14em] transition-colors md:px-3 ${
           transparent ? 'text-white hover:bg-white/15' : 'text-ink-700 hover:bg-plum-50 hover:text-plum-600'
         }`}
       >

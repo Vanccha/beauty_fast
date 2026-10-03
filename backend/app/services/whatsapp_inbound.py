@@ -53,6 +53,8 @@ PLACEHOLDERS = {
     "{link}": "Online randevu sayfasının adresi",
 }
 MAX_WELCOME_LENGTH = 1000
+#: Yenileme davetlerinin cikis anahtar kelimesi (bkz. ``services/rebooking.py``).
+OPT_OUT_KEYWORD = "RET"
 #: Bundan eski gelen mesajlara karsilama gonderilmez.
 MAX_MESSAGE_AGE = timedelta(minutes=10)
 
@@ -111,6 +113,41 @@ def mark_phone_known(db: Session, phone: str) -> None:
     from .messaging import to_whatsapp_number
 
     mark_known(db, to_whatsapp_number(phone), "OUTBOUND")
+
+
+def _message_text(data: dict) -> str:
+    message = data.get("message") if isinstance(data.get("message"), dict) else {}
+    text = message.get("conversation")
+    if not isinstance(text, str):
+        ext = message.get("extendedTextMessage")
+        text = ext.get("text") if isinstance(ext, dict) else ""
+    return text if isinstance(text, str) else ""
+
+
+def _is_opt_out(data: dict) -> bool:
+    """Mesajin tamami "RET" mu (buyuk/kucuk harf ve noktalama fark etmez)?"""
+    cleaned = "".join(ch for ch in _message_text(data) if ch.isalnum())
+    return cleaned.replace("ı", "i").upper() == OPT_OUT_KEYWORD
+
+
+def withdraw_marketing_by_contact(db: Session, key: str | None) -> int:
+    """``key`` (905XXXXXXXXX) numarali musterilerin ticari ileti onayini geri alir."""
+    from ..models import Customer
+    from .messaging import to_whatsapp_number
+    from .privacy import set_marketing_consent
+
+    if not key:
+        return 0
+    count = 0
+    for customer in db.scalars(
+        select(Customer).where(
+            Customer.marketing_consent_at.is_not(None), Customer.phone.is_not(None)
+        )
+    ):
+        if to_whatsapp_number(customer.phone) == key:
+            set_marketing_consent(db, customer, False, now_local())
+            count += 1
+    return count
 
 
 def render_welcome(salon: Salon) -> str:
@@ -185,6 +222,17 @@ def handle_event(db: Session, payload: dict, now: datetime | None = None) -> Wel
         return None
 
     if data.get("messageType") in _IGNORED_TYPES:
+        return None
+
+    # "RET": ticari ileti (yenileme daveti) cikisi. Karsilama akisindan ONCE ve
+    # mesaj yasindan bagimsiz islenir. "IPTAL" bilerek DINLENMEZ: musteriler
+    # randevu iptali icin de yazar, yanlislikla onay geri alinmasin.
+    if _is_opt_out(data):
+        withdrawn = withdraw_marketing_by_contact(db, who)
+        mark_known(db, who, "INBOUND")
+        db.commit()
+        if withdrawn:
+            logger.info("RET: %s musterinin ticari ileti onayi geri alindi", withdrawn)
         return None
     try:
         sent_at = datetime.fromtimestamp(int(data.get("messageTimestamp") or 0))

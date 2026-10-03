@@ -44,6 +44,9 @@ def list_admin_portfolio(db: Session, branch_id: int) -> dict:
                 "imageUrl": i.image_url,
                 "description": i.description,
                 "isPublished": i.is_published,
+                "sortOrder": i.sort_order,
+                "categoryId": i.category_id,
+                "staffId": i.staff_id,
                 "categoryName": i.category.name if i.category else None,
                 "staffName": i.staff.name if i.staff else None,
             }
