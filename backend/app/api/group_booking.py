@@ -20,14 +20,15 @@ from sqlalchemy import delete, select
 
 from ..auth.sessions import get_customer_principal, get_or_create_visitor_key, read_visitor_key
 from ..config import config
-from ..core.opportunity import OccupancySample, score_opportunity
+from ..core.opportunity import fixed_window_discount
 from ..core.package_layout import LayoutOptions, layout_package
 from ..core.reminder_rules import resolve_pre_reminder
 from ..deps import CustomerDep, DbSession
 from ..errors import AppError
 from ..http import EnvelopeRoute
-from ..models import OccupancyStat, ScheduledNotification, SlotLock, Staff
+from ..models import Appointment, Customer, ScheduledNotification, SlotLock, Staff
 from ..services import notification_worker
+from ..services import deposit, push
 from ..services.appointment import confirm_appointment_from_lock
 from ..services.availability import compute_availability
 from ..services.booking_for_other import (
@@ -47,6 +48,7 @@ from ..services.booking_confirmation import (
     queue_confirmation,
 )
 from ..services.catalog import (
+    get_discount_settings,
     assert_staff_can_do,
     get_default_branch,
     get_exclusive_resource_ids,
@@ -249,8 +251,24 @@ def lock_group(body: LockGroupBody, request: Request, response: Response, db: Db
         db.rollback()
         raise
 
+    group_discount = fixed_window_discount(
+        body.date, body.startMin, get_discount_settings(db)
+    )
+
+    deposit_settings = deposit.load_settings(db)
+    person_deposits = [
+        deposit.deposit_for_price(
+            deposit_settings, round(layout.total_price * (1 - group_discount), 2)
+        )
+        for layout in layouts
+    ]
     return {
         "groupId": group_id,
+        "deposit": {
+            "enabled": deposit_settings.enabled,
+            "amount": sum(d or 0 for d in person_deposits) or None,
+            "policy": deposit.POLICY_TEXT if deposit_settings.enabled else None,
+        },
         "expiresAt": acquired[0].expires_at.isoformat(),
         "ttlSeconds": ttl,
         "locks": [
@@ -261,6 +279,8 @@ def lock_group(body: LockGroupBody, request: Request, response: Response, db: Db
                 "startMin": lock.start_min,
                 "endMin": lock.end_min,
                 "totalPrice": layout.total_price,
+                "discountRate": group_discount,
+                "discountedPrice": round(layout.total_price * (1 - group_discount), 2),
             }
             for i, (lock, layout) in enumerate(zip(acquired, layouts))
         ],
@@ -296,26 +316,10 @@ class GroupConfirmPerson(GroupPersonBase):
 class ConfirmGroupBody(BaseModel):
     groupId: str = Field(min_length=1, max_length=36)
     people: list[GroupConfirmPerson] = Field(min_length=1, max_length=MAX_PEOPLE)
-
-
-def _opportunity(db, branch_id: int, date: str, start_min: int):
-    weekday = weekday_of(date)
-    bucket = (start_min // 60) * 60
-    stat = db.scalar(
-        select(OccupancyStat).where(
-            OccupancyStat.branch_id == branch_id,
-            OccupancyStat.weekday == weekday,
-            OccupancyStat.slot_min == bucket,
-        )
-    )
-    return score_opportunity(
-        OccupancySample(
-            weekday=weekday,
-            slot_min=bucket,
-            occupancy=stat.occupancy if stat else 0.5,
-            sample_size=stat.sample_size if stat else 0,
-        )
-    )
+    #: KVKK Aydinlatma Metni "okudum" teyidi (zorunlu).
+    privacyNoticeAck: bool = False
+    #: Saglik beyani onay kutusu (zorunlu; saglik verisi icermez).
+    healthDeclaration: bool = False
 
 
 @router.post("/api/appointments/group")
@@ -325,6 +329,20 @@ def confirm_group(
     """Grubun tum kilitlerini TEK transaction'da randevuya cevirir
     (hepsi ya da hicbiri). Bilgilendirme mesajlari commit'ten sonra gider
     ve basarisizligi randevuyu bozmaz."""
+    # KVKK zorunlu onaylari: kilit/kayit islemlerinden ONCE.
+    if not body.privacyNoticeAck:
+        raise AppError(
+            "PRIVACY_NOTICE_REQUIRED",
+            "Devam etmek için Aydınlatma Metni'ni okuduğunuzu onaylamalısınız.",
+            400,
+        )
+    if not body.healthDeclaration:
+        raise AppError(
+            "HEALTH_DECLARATION_REQUIRED",
+            "Devam etmek için sağlık beyanını onaylamalısınız.",
+            400,
+        )
+
     branch = get_default_branch(db)
     session_id = read_visitor_key(request)
     if not session_id:
@@ -365,6 +383,9 @@ def confirm_group(
     messages: list[tuple[str, str]] = []
     confirmation_lines: list[ConfirmationLine] = []
     total = 0.0
+    discount_settings = get_discount_settings(db)
+    deposit_settings = deposit.load_settings(db)
+    created: list[Appointment] = []
 
     try:
         for index, (person, ben) in enumerate(zip(body.people, recipients)):
@@ -377,7 +398,7 @@ def confirm_group(
             speed_factor = assert_staff_can_do(db, lock.staff_id, service_ids)
             specs = load_service_specs(db, service_ids)
             layout = layout_package(specs, LayoutOptions(speed_factor=speed_factor))
-            opportunity = _opportunity(db, branch.id, lock.date, lock.start_min)
+            discount_rate = fixed_window_discount(lock.date, lock.start_min, discount_settings)
 
             if ben is None:
                 owner_id, owner_name, owner_phone = customer.id, customer.first_name, customer.phone
@@ -403,12 +424,16 @@ def confirm_group(
                 start_min=lock.start_min,
                 layout=layout,
                 exclusive_resource_ids=exclusive,
-                discount_rate=opportunity.discount_rate,
-                is_opportunity=opportunity.is_opportunity,
+                discount_rate=discount_rate,
+                is_opportunity=discount_rate > 0,
                 notes=person.notes,
                 now=now,
+                privacy_notice_ack_at=now,
+                health_declaration_at=now,
+                deposit_settings=deposit_settings,
                 commit=False,
             )
+            created.append(appointment)
 
             pre = resolve_pre_reminder(
                 appointment_id=appointment.id,
@@ -471,22 +496,46 @@ def confirm_group(
                     "startMin": appointment.start_min,
                     "endMin": appointment.end_min,
                     "totalPrice": appointment.total_price,
+                    "discountRate": appointment.discount_rate,
                 }
             )
-        # Alana TEK ozet onay mesaji - randevularla ayni transaction'da.
-        queue_confirmation(
-            db,
-            customer.id,
-            f"{CONFIRM_GROUP_PREFIX}{body.groupId}",
-            build_confirmation_message(customer.first_name, confirmation_lines),
-        )
+        # Alana TEK ozet mesaj - randevularla ayni transaction'da. Kapora aciksa
+        # onay mesajinin YERINE tek kapora talebi gider (tutar = kisi basina
+        # kapora toplami).
+        awaiting = [a for a in created if a.deposit_status == deposit.AWAITING]
+        if awaiting:
+            deposit.queue_deposit_request(
+                db, awaiting, db.get(Customer, customer.id), deposit_settings
+            )
+        else:
+            queue_confirmation(
+                db,
+                customer.id,
+                f"{CONFIRM_GROUP_PREFIX}{body.groupId}",
+                build_confirmation_message(customer.first_name, confirmation_lines),
+            )
         db.commit()
     except Exception:
         db.rollback()
         raise
     notification_worker.kick()
+    push.notify_new_appointments([r["appointmentId"] for r in results])
 
     for phone, text in messages:
         send_beneficiary_info(db, phone, text)
 
-    return {"groupId": body.groupId, "appointments": results, "totalPrice": round(total, 2)}
+    awaiting_total = sum(float(a.deposit_amount or 0) for a in created if a.deposit_status == deposit.AWAITING)
+    deposit_info = (
+        deposit.customer_view(db, created[0], deposit_settings, True)
+        if any(a.deposit_status == deposit.AWAITING for a in created)
+        else None
+    )
+    return {
+        "groupId": body.groupId,
+        "appointments": results,
+        "totalPrice": round(total, 2),
+        #: Kapora bekleniyorsa grup toplami + odeme bilgileri
+        "deposit": (
+            {**deposit_info, "payAmount": awaiting_total} if deposit_info else None
+        ),
+    }

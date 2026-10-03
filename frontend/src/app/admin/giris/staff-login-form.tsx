@@ -9,6 +9,7 @@ export function StaffLoginForm() {
   const router = useRouter();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -17,7 +18,7 @@ export function StaffLoginForm() {
     setBusy(true);
     setError(null);
     try {
-      await apiSend('/api/auth/staff/login', 'POST', { phone, password });
+      await apiSend('/api/auth/staff/login', 'POST', { phone, password, rememberMe });
       router.push('/admin');
       router.refresh();
     } catch (e) {
@@ -61,6 +62,17 @@ export function StaffLoginForm() {
           required
         />
       </div>
+
+      <label className="flex items-center gap-2 text-sm text-ink-700" htmlFor="remember-me">
+        <input
+          id="remember-me"
+          type="checkbox"
+          className="size-4 accent-plum-600"
+          checked={rememberMe}
+          onChange={(e) => setRememberMe(e.target.checked)}
+        />
+        Beni hatırla
+      </label>
 
       {error && <p className="text-sm text-danger-700" role="alert">{error}</p>}
 

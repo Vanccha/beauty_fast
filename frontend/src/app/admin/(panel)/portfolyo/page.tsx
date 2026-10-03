@@ -10,6 +10,8 @@ interface AdminPortfolioResponse {
     imageUrl: string;
     description: string | null;
     isPublished: boolean;
+    categoryId: number | null;
+    staffId: number | null;
     categoryName: string | null;
     staffName: string | null;
   }[];
@@ -33,6 +35,10 @@ export default async function AdminPortfolioPage() {
           id: i.id,
           title: i.title,
           imageUrl: i.imageUrl,
+          description: i.description,
+          isPublished: i.isPublished,
+          categoryId: i.categoryId,
+          staffId: i.staffId,
           categoryName: i.categoryName,
           staffName: i.staffName,
         }))}

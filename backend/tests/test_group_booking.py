@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
 from app.auth.password import hash_password
+from app.core.opportunity import fixed_window_discount
 from app.main import app
 from app.models import Appointment, SlotLock, Staff, StaffService, TimeOff, WorkingHour
 from app.services import messaging
@@ -75,7 +76,7 @@ def lock_group(client, salon, assignments, start=600):
     )
 
 
-def confirm_group(client, group, assignments, notes=None):
+def confirm_group(client, group, assignments, notes=None, **flags):
     people = []
     for lock, (_staff, who) in zip(group["locks"], assignments):
         p = {"lockId": lock["lockId"]}
@@ -86,7 +87,7 @@ def confirm_group(client, group, assignments, notes=None):
         if notes:
             p["notes"] = notes
         people.append(p)
-    return client.post("/api/appointments/group", json={"groupId": group["groupId"], "people": people})
+    return client.post("/api/appointments/group", json={"groupId": group["groupId"], "people": people, "privacyNoticeAck": True, "healthDeclaration": True, **flags},)
 
 
 # ----------------------------------------------------------------- availability
@@ -239,7 +240,7 @@ def test_confirm_group_books_all(client, salon, fake_sender, db):
     asg = [(salon["staff_a"], "self"), (salon["staff_b"], BEN)]
     g = data_of(lock_group(client, salon, asg))
     res = data_of(confirm_group(client, g, asg, notes="selam"))
-    assert res["groupId"] == g["groupId"] and res["totalPrice"] == 700
+    assert res["groupId"] == g["groupId"] and res["totalPrice"] == 700 * (1 - fixed_window_discount(DAY, 600))
     assert [a["personIndex"] for a in res["appointments"]] == [0, 1]
     assert res["appointments"][0]["forCustomer"]["firstName"] == "Ayşe"
     assert res["appointments"][1]["forCustomer"]["firstName"] == "Deniz"
@@ -280,12 +281,14 @@ def test_confirm_group_rejects_incomplete_or_foreign_locks(client, salon):
     g = data_of(lock_group(client, salon, asg))
     partial = client.post(
         "/api/appointments/group",
-        json={"groupId": g["groupId"], "people": [{"lockId": g["locks"][0]["lockId"], "beneficiary": BEN}]},
+        json={"groupId": g["groupId"], "people": [{"lockId": g["locks"][0]["lockId"], "beneficiary": BEN}],
+              "privacyNoticeAck": True, "healthDeclaration": True},
     )
     assert partial.status_code == 409
     wrong = client.post(
         "/api/appointments/group",
-        json={"groupId": "nope", "people": [{"lockId": g["locks"][0]["lockId"], "beneficiary": BEN}]},
+        json={"groupId": "nope", "people": [{"lockId": g["locks"][0]["lockId"], "beneficiary": BEN}],
+              "privacyNoticeAck": True, "healthDeclaration": True},
     )
     assert wrong.status_code == 409
 
@@ -343,6 +346,7 @@ def test_single_booking_label_does_not_leak_stored_name(client, salon):
             json={
                 "lockId": lock["lockId"], "date": DAY, "staffId": body["staffId"], "startMin": 600,
                 "serviceIds": body["serviceIds"], "beneficiary": typed,
+                "privacyNoticeAck": True, "healthDeclaration": True,
             },
         )
     )

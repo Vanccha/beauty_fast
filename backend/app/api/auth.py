@@ -103,6 +103,8 @@ def otp_verify(body: OtpVerifyBody, request: Request, response: Response, db: Db
 class StaffLoginBody(BaseModel):
     phone: str = Field(min_length=10)
     password: str = Field(min_length=4)
+    #: True: 30 gunluk kalici cerez; False: 12 saatlik, tarayici kapaninca silinen oturum.
+    rememberMe: bool = False
 
 
 @router.post("/staff/login")
@@ -135,7 +137,7 @@ def staff_login(
 
     clear_hits(db, STAFF_LOGIN_PHONE, phone)
 
-    create_staff_session(db, response, staff.id)
+    create_staff_session(db, response, staff.id, remember_me=body.rememberMe)
 
     return {
         "staff": {

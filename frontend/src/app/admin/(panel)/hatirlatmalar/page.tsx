@@ -1,5 +1,7 @@
 import { adminApi } from '@/lib/admin-api';
 import { formatPhone } from '@/lib/phone';
+import type { MeResponse } from '@/lib/server-api';
+import { RebookingSettings, type RebookingData } from './rebooking-settings';
 import { SweepButton } from './sweep-button';
 
 export const dynamic = 'force-dynamic';
@@ -101,9 +103,13 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
 export default async function ReminderRulesPage() {
   const now = new Date();
 
-  const [{ rules }, { notifications }] = await Promise.all([
+  const me = await adminApi<MeResponse>('/api/me');
+  const canManage = (me.staff?.role ?? 'STAFF') !== 'STAFF';
+
+  const [{ rules }, { notifications }, rebooking] = await Promise.all([
     adminApi<{ rules: ReminderRuleRow[] }>('/api/admin/reminder-rules'),
     adminApi<{ notifications: QueuedNotification[] }>('/api/admin/notifications?limit=25'),
+    canManage ? adminApi<RebookingData>('/api/admin/rebooking') : Promise.resolve(null),
   ]);
 
   const queue = notifications.map((n) => ({ ...n, dueAt: new Date(n.dueAt) }));
@@ -113,11 +119,17 @@ export default async function ReminderRulesPage() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="muted">Aralıklar formülden hesaplanır — kodda sabit gün yoktur.</p>
+        <p className="muted">Hizmet başına yenileme süreleri aşağıda; kodda sabit gün yoktur.</p>
         <SweepButton pendingDue={pendingDue} />
       </div>
 
-      <div className="space-y-2">
+      {rebooking && <RebookingSettings initial={rebooking} />}
+
+      <details className="group space-y-2">
+        <summary className="eyebrow cursor-pointer select-none py-1">
+          Gelişmiş: tüm kurallar ({rules.length})
+        </summary>
+        <div className="space-y-2">
         {rules.map((r) => {
           const params = describeParams(r.params);
           // Önizleme FastAPI'de `compute_interval_days` ile hesaplanır.
@@ -168,7 +180,8 @@ export default async function ReminderRulesPage() {
             </article>
           );
         })}
-      </div>
+        </div>
+      </details>
 
       {/* ---------------- Bildirim kuyruğu ---------------- */}
       <section className="card !p-4">

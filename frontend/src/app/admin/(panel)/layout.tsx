@@ -3,8 +3,9 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { InstallButton } from '@/components/pwa/InstallButton';
+import { PushBell } from '@/components/pwa/PushBell';
 import { serverApi, type MeResponse, type SalonInfo } from '@/lib/server-api';
-import { AdminAccordion, StaffLogout, type AdminSection } from './nav';
+import { AdminSections, StaffLogout, type AdminSection } from './nav';
 import type { MessagingStatus } from './whatsapp/whatsapp-connect';
 
 export const dynamic = 'force-dynamic';
@@ -71,6 +72,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
           <div className="flex items-center gap-2">
             <InstallButton />
+            <PushBell />
             <Link href="/" className="btn-ghost btn-sm hidden md:inline-flex">
               Siteyi gör
               <ExternalLink size={14} strokeWidth={1.5} aria-hidden />
@@ -95,7 +97,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       )}
 
       <main className="mx-auto max-w-7xl px-3 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-4">
-        <AdminAccordion sections={sections}>{children}</AdminAccordion>
+        <AdminSections sections={sections}>{children}</AdminSections>
       </main>
     </div>
   );

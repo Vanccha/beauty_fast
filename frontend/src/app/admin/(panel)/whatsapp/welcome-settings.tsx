@@ -1,5 +1,6 @@
 'use client';
 
+import { Pencil } from 'lucide-react';
 import { useState } from 'react';
 
 import { ApiError, apiSend } from '@/lib/api-client';
@@ -29,6 +30,7 @@ export function WelcomeSettings({ initial }: { initial: WelcomeSettingsData }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const dirty = enabled !== data.enabled || message !== (data.message ?? data.defaultMessage);
 
@@ -44,11 +46,55 @@ export function WelcomeSettings({ initial }: { initial: WelcomeSettingsData }) {
       setData(next);
       setMessage(next.message ?? next.defaultMessage);
       setSaved(true);
+      setEditing(false);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Kaydedilemedi.');
     } finally {
       setBusy(false);
     }
+  }
+
+  function cancel() {
+    setEnabled(data.enabled);
+    setMessage(data.message ?? data.defaultMessage);
+    setError(null);
+    setSaved(false);
+    setEditing(false);
+  }
+
+  if (!editing) {
+    return (
+      <section className="card space-y-2 !p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <h2 className="eyebrow">Karşılama mesajı</h2>
+            <span className={`badge ${data.enabled ? 'bg-success-50 text-success-700' : 'bg-sand-100 text-ink-500'}`}>
+              {data.enabled ? 'Açık' : 'Kapalı'}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn-secondary btn-sm inline-flex items-center gap-1.5"
+            onClick={() => {
+              setSaved(false);
+              setEditing(true);
+            }}
+          >
+            <Pencil size={14} strokeWidth={1.5} aria-hidden />
+            Düzenle
+          </button>
+        </div>
+        <p className="muted line-clamp-2 whitespace-pre-line text-sm">
+          {data.preview || data.message || data.defaultMessage}
+        </p>
+        {saved && <p className="text-sm text-success-700">Kaydedildi.</p>}
+        {!data.inboundConfigured && (
+          <p className="text-xs text-brass-700">
+            Sunucu gelen mesajları almıyor; karşılama mesajı gönderilmez.
+          </p>
+        )}
+      </section>
+    );
   }
 
   return (
@@ -120,7 +166,9 @@ export function WelcomeSettings({ initial }: { initial: WelcomeSettingsData }) {
             Varsayılan metne dön
           </button>
         )}
-        {saved && !dirty && <span className="text-sm text-emerald-700">Kaydedildi.</span>}
+        <button type="button" className="btn-ghost btn-sm" disabled={busy} onClick={cancel}>
+          Vazgeç
+        </button>
         {error && <span className="text-sm text-danger-700">{error}</span>}
       </div>
 

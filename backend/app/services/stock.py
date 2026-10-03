@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..errors import is_unique_violation
 from ..models import AppointmentItem, InventoryItem, ServiceConsumable, StockMovement
+from . import push
 
 
 def consume_for_appointment(db: Session, appointment_id: int) -> dict:
@@ -115,6 +116,9 @@ def consume_for_appointment(db: Session, appointment_id: int) -> dict:
                 "unit": item.unit,
                 "remaining": item.quantity,
                 "belowCritical": below_critical,
+                #: Bu dusumla kritik seviyenin ALTINA yeni inildi (push icin)
+                "crossedCritical": below_critical
+                and (item.quantity + qty) > item.critical_level,
             }
         )
 
@@ -172,8 +176,11 @@ def adjust_stock(
         )
     )
     item = db.get(InventoryItem, item_id, with_for_update=True, populate_existing=True)
+    before = item.quantity
     item.quantity = round(item.quantity + delta, 4)
     db.commit()
+    if before > item.critical_level >= item.quantity:
+        push.notify_low_stock([(item.name, item.quantity, item.unit)])
     return item
 
 

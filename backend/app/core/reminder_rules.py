@@ -154,13 +154,14 @@ def compute_interval_days(rule: ReminderRuleSpec, context: ReminderContext) -> i
     return rule.base_days
 
 
-def _render_template(template: str, context: ReminderContext, days: int) -> str:
+def render_template(template: str, context: ReminderContext, days: int) -> str:
     return (
         template.replace("{ad}", context.customer_name)
         .replace("{hizmet}", context.service_name)
         .replace("{gun}", str(days))
         .replace("{salon}", context.salon_name or "Salonumuz")
         .replace("{link}", context.booking_url or "")
+        .replace("{randevu_linki}", context.booking_url or "")
     )
 
 
@@ -194,7 +195,7 @@ def resolve_reminder(
         channel=rule.channel if rule else "SMS",
         due_at=context.performed_at + timedelta(days=days),
         days=days,
-        body=_render_template(template, context, days),
+        body=render_template(template, context, days),
         dedupe_key=f"repeat:{appointment_id}:{rule.id if rule else 'default'}:{context.service_id}",
     )
 

@@ -91,7 +91,7 @@ export function ShadowBadge() {
   return (
     <span
       className="badge bg-brass-300/20 text-brass-700"
-      title="Bu saat, ustanın başka bir işlemde beklediği süreye denk geliyor"
+      title="Bu saat, personelin başka bir işlemde beklediği süreye denk geliyor"
     >
       <Hourglass size={14} strokeWidth={1.5} aria-hidden />
       Ara saat

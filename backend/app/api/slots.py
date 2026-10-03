@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 
 from ..auth.sessions import get_customer_principal, get_or_create_visitor_key, read_visitor_key
+from ..core.opportunity import fixed_window_discount
 from ..core.package_layout import LayoutOptions, layout_package
 from ..deps import DbSession
 from ..errors import AppError
@@ -29,12 +30,14 @@ from ..services.booking_for_other import (
     is_self,
 )
 from ..services.catalog import (
+    get_discount_settings,
     assert_staff_can_do,
     get_default_branch,
     get_exclusive_resource_ids,
     load_service_specs,
     validate_service_ids,
 )
+from ..services import deposit
 from ..services.soft_lock import acquire_slot_lock, find_active_lock, release_slot_lock
 from ..time_utils import is_date_key, minutes_to_label, now_local, to_date_key
 
@@ -176,7 +179,22 @@ def lock_slot(body: LockBody, request: Request, response: Response, db: DbSessio
         beneficiary_customer_id=beneficiary_id,
     )
 
+    lock_discount = fixed_window_discount(
+        lock.date, lock.start_min, get_discount_settings(db)
+    )
+
+    deposit_settings = deposit.load_settings(db)
+    deposit_amount = deposit.deposit_for_price(
+        deposit_settings, round(layout.total_price * (1 - lock_discount), 2)
+    )
     return {
+        #: Kapora onizlemesi (kapali ise enabled=false)
+        "deposit": {
+            "enabled": deposit_settings.enabled,
+            "amount": deposit_amount,
+            "percent": deposit_settings.percent,
+            "policy": deposit.POLICY_TEXT if deposit_settings.enabled else None,
+        },
         "lockId": lock.lock_id,
         "date": lock.date,
         "startMin": lock.start_min,
@@ -186,7 +204,11 @@ def lock_slot(body: LockBody, request: Request, response: Response, db: DbSessio
         "expiresAt": lock.expires_at.isoformat(),
         "ttlSeconds": lock.ttl_seconds,
         "totalMin": layout.total_min,
+        #: totalPrice = INDIRIMSIZ tutar. Gercek tutar randevu onayinda
+        #: sunucuda (o anki ayarlarla) yeniden hesaplanir.
         "totalPrice": layout.total_price,
+        "discountRate": lock_discount,
+        "discountedPrice": round(layout.total_price * (1 - lock_discount), 2),
         "savedMin": layout.saved_min,
     }
 

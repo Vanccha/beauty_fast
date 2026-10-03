@@ -62,7 +62,7 @@ from ..core.availability import (
     find_available_slots,
     staff_busy_intervals_of,
 )
-from ..core.opportunity import OccupancySample, score_day
+from ..core.opportunity import fixed_window_discount, window_label
 from ..core.package_layout import LayoutOptions, layout_package
 from ..core.recommendation import suggest_shadow_fillers
 from ..core.types import PackageLayout, ResourceCalendar
@@ -72,7 +72,6 @@ from ..models import (
     AppointmentItem,
     AppointmentResource,
     OccupancyCell,
-    OccupancyStat,
     Resource,
     Service,
     SlotLock,
@@ -83,6 +82,7 @@ from ..time_utils import minutes_to_label, now_local, now_parts, weekday_of
 from .catalog import (
     find_capable_staff,
     get_default_branch,
+    get_discount_settings,
     load_service_specs,
     staff_speed_factor_for,
 )
@@ -180,12 +180,6 @@ def compute_availability(
         else []
     )
 
-    stat_rows = db.scalars(
-        select(OccupancyStat).where(
-            OccupancyStat.branch_id == branch.id, OccupancyStat.weekday == weekday
-        )
-    ).all()
-
     view_rows = db.execute(
         select(SlotViewEvent.staff_id, SlotViewEvent.start_min, SlotViewEvent.viewer_key).where(
             SlotViewEvent.branch_id == branch.id, SlotViewEvent.date == date
@@ -205,16 +199,8 @@ def compute_availability(
         for rid, capacity in resource_rows
     ]
 
-    # --- Firsat saati skorlari (saat basi kovalar) ----------------------
-    hour_slots = list(range(branch.open_minute, branch.close_minute, 60))
-    opportunity_by_hour = score_day(
-        weekday,
-        hour_slots,
-        [
-            OccupancySample(s.weekday, s.slot_min, s.occupancy, s.sample_size)
-            for s in stat_rows
-        ],
-    )
+    # --- Firsat saati: hafta ici erken saat, sabit oran -----------------
+    discount_settings = get_discount_settings(db)
 
     # --- Gercek goruntulenme sayilari (tekil ziyaretci) ------------------
     view_counts: dict[tuple[int, int], set[str]] = {}
@@ -335,8 +321,7 @@ def compute_availability(
 
         slots = []
         for slot in result.slots:
-            hour = (slot.start_min // 60) * 60
-            opportunity = opportunity_by_hour.get(hour)
+            discount = fixed_window_discount(date, slot.start_min, discount_settings)
             slots.append(
                 {
                     "startMin": slot.start_min,
@@ -345,9 +330,9 @@ def compute_availability(
                     "endLabel": minutes_to_label(slot.end_min),
                     "isShadowFill": slot.is_shadow_fill,
                     "shadowParentAppointmentId": slot.shadow_parent_appointment_id,
-                    "discountRate": opportunity.discount_rate if opportunity else 0,
-                    "opportunityLabel": opportunity.label if opportunity else "Standart",
-                    "isOpportunity": opportunity.is_opportunity if opportunity else False,
+                    "discountRate": discount,
+                    "opportunityLabel": window_label(discount),
+                    "isOpportunity": discount > 0,
                     "viewCount": len(view_counts.get((staff.id, slot.start_min), ())),
                     # Bu slot su an bu ziyaretcinin kendi kilidi mi?
                     "heldByYou": bool(
@@ -357,6 +342,11 @@ def compute_availability(
                     ),
                 }
             )
+
+        # Dolu saatler: yalnizca saat bilgisi (musteri verisi sizmaz).
+        busy_slots = [
+            {"startMin": m, "label": minutes_to_label(m)} for m in result.busy_starts
+        ]
 
         staff_results.append(
             {
@@ -368,6 +358,7 @@ def compute_availability(
                 "totalPrice": layout.total_price,
                 "savedMin": layout.saved_min,
                 "slots": slots,
+                "busySlots": busy_slots,
                 "diagnostics": {
                     "requiredMin": result.diagnostics.required_min,
                     "longestFreeWindowMin": result.diagnostics.longest_free_window_min,

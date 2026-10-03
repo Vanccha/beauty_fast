@@ -127,13 +127,13 @@ export function PrivacyPanel({ initial }: { initial: PrivacyStatus }) {
             <>
               <p className="muted mt-0.5">
                 {formatDate(status.healthConsentAt)} tarihinde verdiğin açık rızayla salonda alerji
-                bilgin kayıtlı; usta işlem öncesi uyarı görür.
+                bilgin kayıtlı; personel işlem öncesi uyarı görür.
               </p>
               {confirm === 'health' ? (
                 <div className="alert alert-warning mt-3 block">
                   <p>
                     Kayıtlı alerji bilgilerin <strong>kalıcı olarak silinecek</strong>. Sonraki
-                    ziyaretlerinde alerjini ustana sözlü olarak bildirmelisin.
+                    ziyaretlerinde alerjini personele sözlü olarak bildirmelisin.
                   </p>
                   <div className="mt-3 flex gap-2">
                     <button type="button" className="btn-secondary btn-sm flex-1" onClick={() => setConfirm(null)}>

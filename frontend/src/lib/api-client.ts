@@ -62,8 +62,12 @@ export async function apiSend<T>(
 }
 
 /** `multipart/form-data` gönderimi — Content-Type tarayıcıya bırakılır. */
-export async function apiUpload<T>(url: string, form: FormData): Promise<T> {
-  return unwrap<T>(await fetch(url, { method: 'POST', body: form }));
+export async function apiUpload<T>(
+  url: string,
+  form: FormData,
+  method: 'POST' | 'PATCH' = 'POST',
+): Promise<T> {
+  return unwrap<T>(await fetch(url, { method, body: form }));
 }
 
 /** 570 → "09:30" (istemci tarafında da gerekiyor) */

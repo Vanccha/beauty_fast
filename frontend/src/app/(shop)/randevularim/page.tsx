@@ -9,6 +9,8 @@ import { safeNext } from '@/lib/safe-next';
 import { serverApi, type MeResponse } from '@/lib/server-api';
 import { formatDateTr, minutesToLabel } from '@/lib/time';
 import { AppointmentActions, GroupCancel, LogoutButton } from './actions';
+import { DepositNotice, type CustomerDeposit } from '@/components/booking/DepositNotice';
+import { appointmentLabel, appointmentTone } from '@/lib/appointment-status';
 import { PrivacyPanel, type PrivacyStatus } from './privacy-panel';
 import { ReviewForm } from './review-form';
 import { VerifyGate } from './verify-gate';
@@ -28,6 +30,10 @@ interface MineAppointment {
   services: { id: number; name: string; price: number }[];
   designRefs: { id: number; source: string; url: string }[];
   cancellable: boolean;
+  /** Randevuya 60 dakikadan az kaldı: iptal kapalı */
+  cancelLocked: boolean;
+  cancelLockedMessage: string;
+  deposit: CustomerDeposit | null;
   hasReview: boolean;
   forCustomer: { id: number; firstName: string };
   bookedByMe: boolean;
@@ -122,8 +128,11 @@ export default async function AppointmentsPage({
                   <p className="mt-1 text-sm">
                     {a.items.map((i) => i.service.name).join(' + ')}
                   </p>
+                  <span className={`badge mt-2 ${appointmentTone(a.status, a.deposit?.status)}`}>
+                    {appointmentLabel(a.status, a.deposit?.status)}
+                  </span>
                   {a.bookedByMe && !a.isMine && (
-                    <span className="badge mt-2 bg-sand-100 text-ink-700">
+                    <span className="badge ml-1.5 mt-2 bg-sand-100 text-ink-700">
                       Kimin için: {a.forCustomer.firstName}
                     </span>
                   )}
@@ -163,7 +172,18 @@ export default async function AppointmentsPage({
                 </div>
               )}
 
-              <AppointmentActions appointmentId={a.id} version={a.version} />
+              {a.deposit && (
+                <div className="mt-4">
+                  <DepositNotice deposit={a.deposit} />
+                </div>
+              )}
+
+              <AppointmentActions
+                appointmentId={a.id}
+                version={a.version}
+                cancelLocked={a.cancelLocked}
+                cancelLockedMessage={a.cancelLockedMessage}
+              />
             </article>
   );
 
@@ -213,7 +233,12 @@ export default async function AppointmentsPage({
                     <Users size={16} strokeWidth={1.5} aria-hidden />
                     Grup randevusu · {formatDateTr(g.items[0].date)} {minutesToLabel(g.items[0].startMin)}
                   </p>
-                  {g.items.some((x) => x.bookedByMe) && <GroupCancel groupId={g.groupId} />}
+                  {g.items.some((x) => x.bookedByMe) &&
+                    (g.items.some((x) => x.cancelLocked) ? (
+                      <p className="muted text-xs">Randevuya 1 saatten az kaldığı için grup iptal edilemez.</p>
+                    ) : (
+                      <GroupCancel groupId={g.groupId} />
+                    ))}
                 </div>
                 {g.items.map((a) => renderUpcoming(a))}
               </div>
@@ -280,22 +305,15 @@ export default async function AppointmentsPage({
                       </span>
                     )}
                   </div>
-                  <span
-                    className={`badge ${
-                      a.status === 'COMPLETED'
-                        ? 'bg-success-50 text-success-700'
-                        : a.status === 'NO_SHOW'
-                          ? 'bg-danger-50 text-danger-700'
-                          : 'bg-sand-100 text-ink-500'
-                    }`}
-                  >
-                    {a.status === 'COMPLETED'
-                      ? 'Tamamlandı'
-                      : a.status === 'NO_SHOW'
-                        ? 'Gelinmedi'
-                        : 'İptal'}
+                  <span className={`badge ${appointmentTone(a.status, a.deposit?.status)}`}>
+                    {appointmentLabel(a.status, a.deposit?.status)}
                   </span>
                 </div>
+                {a.deposit && a.deposit.status !== 'NONE' && a.deposit.status !== 'AWAITING' && (
+                  <div className="mt-2">
+                    <DepositNotice deposit={a.deposit} compact />
+                  </div>
+                )}
 
                 {/*
                   Değerlendirme yalnızca TAMAMLANMIŞ ve henüz yorumlanmamış

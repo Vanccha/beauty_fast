@@ -116,7 +116,7 @@ body::before {
   }
 
   .card {
-    @apply rounded-[4px] border border-sand-200 bg-white p-6 md:p-8;
+    @apply rounded-2xl border border-sand-200 bg-white p-6 md:p-8;
   }
 
   .btn,
@@ -126,10 +126,10 @@ body::before {
   .btn-light,
   .btn-outline-light,
   .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 rounded-[2px] border border-transparent px-7
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-transparent px-6
            whitespace-nowrap text-xs font-semibold uppercase disabled:cursor-not-allowed disabled:opacity-45;
-    min-height: 3rem;
-    letter-spacing: 0.14em;
+    min-height: 2.75rem;
+    letter-spacing: 0.08em;
     font-family: var(--font-sans);
     text-decoration: none;
     transition:
@@ -163,11 +163,11 @@ body::before {
   }
 
   .btn-primary {
-    @apply border-plum-600 bg-plum-600 text-white hover:border-plum-700 hover:bg-plum-700;
+    @apply border-plum-600 bg-plum-600 text-white shadow-sm shadow-plum-900/10 hover:border-plum-700 hover:bg-plum-700;
   }
 
   .btn-secondary {
-    @apply border-ink-900 bg-transparent text-ink-900 hover:bg-ink-900 hover:text-sand-50;
+    @apply border-plum-300 bg-transparent text-plum-600 hover:border-plum-400 hover:bg-plum-50 hover:text-plum-700;
   }
 
   .btn-ghost {
@@ -214,8 +214,8 @@ body::before {
 
   /* Süzgeç / gün / saat seçicileri */
   .chip {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-[2px] border border-sand-300 bg-white
-           whitespace-nowrap px-4 text-sm text-ink-700 hover:border-ink-900 disabled:cursor-not-allowed disabled:opacity-45;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-full border border-sand-300 bg-white
+           whitespace-nowrap px-4 text-sm text-ink-700 hover:border-plum-300 hover:text-plum-600 disabled:cursor-not-allowed disabled:opacity-45;
     min-height: 2.5rem;
     font-variant-numeric: tabular-nums;
     transition:
@@ -225,21 +225,21 @@ body::before {
   }
   .chip[aria-pressed='true'],
   .chip-active {
-    @apply border-ink-900 bg-ink-900 text-sand-50;
+    @apply border-plum-300 bg-plum-50 font-semibold text-plum-600;
   }
   /* Rezervasyon seçimleri için birincil renk: `chip chip-primary` */
   .chip-primary[aria-pressed='true'],
   .chip-primary.chip-active {
-    @apply border-plum-600 bg-plum-600 text-white;
+    @apply border-plum-600 bg-plum-50 text-plum-700 ring-1 ring-plum-600;
   }
 
   .badge {
-    @apply inline-flex items-center gap-1 rounded-[2px] bg-sand-100 px-2.5 py-1 text-[11px] font-semibold uppercase text-ink-700;
+    @apply inline-flex items-center gap-1 rounded-full bg-sand-100 px-2.5 py-1 text-[11px] font-semibold uppercase text-ink-700;
     letter-spacing: 0.12em;
   }
 
   .field {
-    @apply w-full rounded-[2px] border border-sand-300 bg-white px-4 text-[15px] text-ink-900 outline-none
+    @apply w-full rounded-xl border border-sand-300 bg-white px-4 text-[15px] text-ink-900 outline-none
            placeholder:text-ink-400 focus:border-ink-900 disabled:opacity-60;
     min-height: 3rem;
     transition: border-color 200ms var(--ease-out-soft);
@@ -476,66 +476,5 @@ body::before {
   }
   .admin-shell .alert {
     @apply px-3 py-2.5;
-  }
-
-  /* Akordeon menü */
-  .admin-accordion {
-    @apply m-0 list-none border border-sand-200 bg-white p-0;
-    border-radius: 4px;
-  }
-  .admin-acc-item {
-    @apply min-w-0 border-b border-sand-200;
-  }
-  .admin-acc-item:last-child {
-    border-bottom: 0;
-  }
-  .admin-acc-row {
-    @apply flex items-center gap-3 px-3 text-ink-900 no-underline md:px-4;
-    min-height: 3.25rem;
-    scroll-margin-top: var(--admin-header-h, 4.75rem); /* sabit üst barın altında kalmasın */
-    transition: background-color 200ms var(--ease-out-soft);
-  }
-  .admin-acc-row:hover {
-    background: var(--color-sand-50);
-  }
-  .admin-acc-row:focus-visible {
-    outline: 2px solid var(--color-plum-600);
-    outline-offset: -2px;
-  }
-  .admin-acc-icon {
-    @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[2px] border border-sand-200 text-ink-500;
-  }
-  .admin-acc-label {
-    @apply block truncate text-[15px] font-semibold;
-  }
-  .admin-acc-desc {
-    @apply block truncate text-xs text-ink-500;
-  }
-  .admin-acc-chevron {
-    @apply shrink-0 text-ink-400;
-    transition: transform 250ms var(--ease-out-soft);
-  }
-  /* Açık satır kaydırırken üst barın altında yapışık kalır (kapatmak için
-     yukarı çıkmaya gerek yok); bölüm içeriği bitince onunla birlikte gider. */
-  .admin-acc-item[data-open='true'] > .admin-acc-row {
-    @apply bg-sand-50;
-    position: sticky;
-    top: var(--admin-header-h, 4.75rem);
-    z-index: 20;
-    box-shadow:
-      inset 2px 0 0 var(--color-plum-600),
-      0 1px 0 var(--color-sand-200);
-  }
-  .admin-acc-item[data-open='true'] .admin-acc-icon {
-    @apply border-plum-600 bg-plum-600 text-white;
-  }
-  .admin-acc-item[data-open='true'] .admin-acc-chevron {
-    transform: rotate(180deg);
-    color: var(--color-plum-600);
-  }
-  /* Açılan panel: tam genişlik; geniş içerik (takvim) panel içinde yatay kayar. */
-  .admin-acc-panel {
-    @apply min-w-0 overflow-x-auto border-t border-sand-200 p-3 md:p-4;
-    background: var(--color-sand-50);
   }
 }

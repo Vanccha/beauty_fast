@@ -213,9 +213,9 @@ export default async function HomePage() {
             <>
               <p className="eyebrow !text-brass-300">Kadıköy · {branch.name}</p>
               <h1 className="display mt-3 max-w-3xl text-3xl font-light leading-[1.08] md:text-6xl">
-                Kendine ayırdığın zaman,
+                Kendinize ayırdığınız
                 <br />
-                işini bilen ellerde.
+                <em className="font-light italic text-brass-300">en güzel saat.</em>
               </h1>
               <p className="mt-4 max-w-xl text-base leading-relaxed text-white/85 md:text-lg [@media(max-height:720px)]:hidden">
                 {branch.salon.name} — saç, tırnak, kaş ve cilt bakımında {stats.staffCount} uzman.
@@ -225,7 +225,7 @@ export default async function HomePage() {
 
               <div className="mt-6 flex flex-wrap items-center gap-3 [@media(max-height:720px)]:mt-4">
                 <Link href="/randevu" className="btn-light group">
-                  Uygun saatleri gör
+                  Size uygun saati bulalım
                   <ArrowRight size={16} strokeWidth={1.5} aria-hidden className="transition-transform duration-300 group-hover:translate-x-[3px]" />
                 </Link>
                 <Link href="/#portfolyo" className="btn-outline-light [@media(max-height:720px)]:hidden">
@@ -374,7 +374,7 @@ export default async function HomePage() {
           <p className="eyebrow reveal">Öne çıkanlar</p>
           <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
             <h2 className="display reveal text-2xl md:text-4xl">İmza hizmetlerimiz</h2>
-            <p className="muted">Süreler ustanın hızına göre değişebilir; fiyatlar sabittir.</p>
+            <p className="muted">Süreler personelin hızına göre değişebilir; fiyatlar sabittir.</p>
           </div>
 
           <ul className="mt-6 border-t border-sand-200 md:mt-8">
@@ -496,8 +496,8 @@ export default async function HomePage() {
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
           <h2 className="display reveal text-2xl md:text-4xl">İşi yapan eller</h2>
           <p className="muted max-w-xl">
-            Randevu alırken ustanı kendin seçebilirsin. Puanlar yalnızca en az üç yorum almış
-            ustalar için gösterilir.
+            Randevu alırken personelini kendin seçebilirsin. Puanlar yalnızca en az üç yorum almış
+            personel için gösterilir.
           </p>
         </div>
 
@@ -579,12 +579,12 @@ export default async function HomePage() {
               {
                 icon: Droplets,
                 title: 'Bekleme süren bize yazılır, sana değil',
-                body: 'Boya beklemesi gibi pasif süreler ustanın takviminde ayrı işaretlenir; kimse kapıda tutulmaz.',
+                body: 'Boya beklemesi gibi pasif süreler personelin takviminde ayrı işaretlenir; kimse kapıda tutulmaz.',
               },
               {
                 icon: FlaskConical,
                 title: 'Alerji ve hassasiyet kaydın dosyanda durur',
-                body: 'Bir kez söylediğin hassasiyet her randevuda ustanın ekranında çıkar; gerekirse patch testi hatırlatırız.',
+                body: 'Bir kez söylediğin hassasiyet her randevuda personelin ekranında çıkar; gerekirse patch testi hatırlatırız.',
               },
               {
                 icon: Sparkles,
@@ -686,11 +686,11 @@ export default async function HomePage() {
               },
               {
                 q: 'Boya beklerken salonda ne kadar oturuyorum?',
-                a: 'Boyanın işlem süresi randevuna dahildir ve önceden gösterilir. Bu süre boyunca ustan başka bir kısa işe geçebilir, ama senin saatin kaymaz.',
+                a: 'Boyanın işlem süresi randevuna dahildir ve önceden gösterilir. Bu süre boyunca personelin başka bir kısa işe geçebilir, ama senin saatin kaymaz.',
               },
               {
                 q: 'Alerjim var, ne yapmalıyım?',
-                a: 'Randevu notuna yazman yeterli; kaydın dosyana işlenir ve her randevuda ustanın ekranında görünür. Saç boyası gibi işlemlerde gerekiyorsa 48 saat önceden patch testi öneririz.',
+                a: 'Randevu notuna yazman yeterli; kaydın dosyana işlenir ve her randevuda personelin ekranında görünür. Saç boyası gibi işlemlerde gerekiyorsa 48 saat önceden patch testi öneririz.',
               },
             ].map((item) => (
               <details key={item.q} className="group py-2">
@@ -727,14 +727,13 @@ export default async function HomePage() {
 
           <div className="relative px-6 py-10 text-center text-white md:py-14">
             <h2 className="display mx-auto max-w-xl text-2xl font-light leading-tight md:text-4xl">
-              Uygun saatini şimdi seç
+              Kendinize bir saat ayırmaya hazır mısınız?
             </h2>
             <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-white/85 md:text-base">
-              Takvimi aç, sana uyan saati gör. Birden çok hizmet seçersen tek blok açılır ve
-              daha erken çıkarsın.
+              Takvimi açın, size en uygun saati birkaç dokunuşla ayırın.
             </p>
             <Link href="/randevu" className="btn-light group mt-6">
-              Randevu al
+              Saatinizi seçin
               <ArrowRight size={16} strokeWidth={1.5} aria-hidden className="transition-transform duration-300 group-hover:translate-x-[3px]" />
             </Link>
           </div>

@@ -22,3 +22,6 @@ frontend/public/photos/*
 # Editör / OS
 .DS_Store
 Thumbs.db
+
+# Web Push gelistirme anahtarlari
+backend/.vapid-dev.json

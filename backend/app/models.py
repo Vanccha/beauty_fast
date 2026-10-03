@@ -28,11 +28,13 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
 )
 from sqlalchemy import true as sa_true
+from sqlalchemy import false as sa_false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -62,6 +64,55 @@ class Salon(Base):
     #: Karsilama metni; bossa varsayilan metin kullanilir.
     #: Yer tutucular: {salon}, {link}. Bkz. ``services/whatsapp_inbound.py``.
     whatsapp_welcome_message: Mapped[str | None] = mapped_column(Text, default=None)
+    #: Firsat saati indirimi: hafta ici erken saat, SABIT oran.
+    #: Bkz. ``core/opportunity.py: fixed_window_discount``.
+    discount_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=sa_true()
+    )
+    discount_rate: Mapped[float] = mapped_column(Float, default=0.10, server_default="0.10")
+    #: Bu dakikadan ONCE baslayan randevulara indirim (720 = 12:00)
+    discount_cutoff_min: Mapped[int] = mapped_column(Integer, default=720, server_default="720")
+    #: Virgullu gun listesi, 0 = Pazar ... 6 = Cumartesi
+    discount_days: Mapped[str] = mapped_column(
+        String(20), default="1,2,3,4,5", server_default="1,2,3,4,5"
+    )
+    #: Ziyaret sonrasi mesaj (islemsel geri bildirim, ticari icerik YOK).
+    #: Bkz. ``services/post_visit.py``.
+    post_visit_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=sa_false()
+    )
+    #: Randevu tamamlandiktan kac saat sonra gonderilsin.
+    post_visit_delay_hours: Mapped[int] = mapped_column(Integer, default=2, server_default="2")
+    #: Ozel metin; bossa varsayilan metin. Yer tutucular: {ad} {hizmetler}
+    #: {yorum_linki} {google_linki} {instagram_linki}
+    post_visit_message: Mapped[str | None] = mapped_column(Text, default=None)
+    #: Bos metin = bu baglanti mesajdan cikarilir. Varsayilanlar ORNEK degerdir.
+    google_review_url: Mapped[str] = mapped_column(
+        String(300),
+        default="https://g.page/r/ORNEK-GOOGLE-YORUM-LINKI/review",
+        server_default="https://g.page/r/ORNEK-GOOGLE-YORUM-LINKI/review",
+    )
+    instagram_url: Mapped[str] = mapped_column(
+        String(300),
+        default="https://instagram.com/ornek_salon",
+        server_default="https://instagram.com/ornek_salon",
+    )
+    #: KAPORA (deposit): acik oldugunda online randevu PENDING + deposit AWAITING
+    #: olusur, salon havaleyi elle onaylar. Bkz. ``services/deposit.py``.
+    deposit_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=sa_false()
+    )
+    #: Kapora orani (% olarak tam sayi) ve alt sinir (TL).
+    deposit_percent: Mapped[int] = mapped_column(Integer, default=20, server_default="20")
+    deposit_min_amount: Mapped[int] = mapped_column(Integer, default=100, server_default="100")
+    #: Bosluksuz buyuk harf IBAN.
+    deposit_iban: Mapped[str] = mapped_column(String(34), default="", server_default="")
+    deposit_account_name: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    deposit_bank_name: Mapped[str] = mapped_column(String(80), default="", server_default="")
+    #: Kapora bu kadar dakika icinde gelmezse yoneticilere uyari push'u.
+    deposit_deadline_minutes: Mapped[int] = mapped_column(Integer, default=60, server_default="60")
+    #: Ozel WhatsApp metni; bossa varsayilan.
+    deposit_message: Mapped[str | None] = mapped_column(Text, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     branches: Mapped[list["Branch"]] = relationship(back_populates="salon")
@@ -464,11 +515,42 @@ class Appointment(Base):
     )
 
     notes: Mapped[str | None] = mapped_column(Text, default=None)
+    #: "ONLINE" (musteri akisi) | "ADMIN" (panelden elle eklenen)
+    source: Mapped[str] = mapped_column(String(10), default="ONLINE", server_default="ONLINE")
+    #: Panelden ekleyen personel (ONLINE kayitlarda NULL)
+    created_by_staff_id: Mapped[int | None] = mapped_column(
+        ForeignKey("staff.id", ondelete="SET NULL"), default=None
+    )
+    #: KAPORA. ``deposit_amount`` NULL = kapora istenmedi. ``deposit_status``:
+    #: "NONE" | "AWAITING" | "PAID" | "REFUND_DUE" | "REFUNDED" | "FORFEITED".
+    #: AWAITING iken ``status`` = PENDING (slot dolu). Bkz. ``services/deposit.py``.
+    deposit_amount: Mapped[float | None] = mapped_column(Numeric(10, 2, asdecimal=False), default=None)
+    deposit_status: Mapped[str] = mapped_column(String(12), default="NONE", server_default="NONE")
+    deposit_requested_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+    deposit_paid_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+    deposit_paid_by_staff_id: Mapped[int | None] = mapped_column(
+        ForeignKey("staff.id", ondelete="SET NULL"), default=None
+    )
+    deposit_refund_due_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+    deposit_refunded_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+    deposit_refunded_by_staff_id: Mapped[int | None] = mapped_column(
+        ForeignKey("staff.id", ondelete="SET NULL"), default=None
+    )
+    #: Gecikme uyarisi (push) en son ne zaman gitti? AWAITING icin tek sefer.
+    deposit_overdue_alerted_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+    #: Iade hatirlatmasi (push) en son ne zaman gitti? (24 saat, sure dolunca, sonra gunluk)
+    deposit_refund_alerted_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+    #: KVKK Aydinlatma Metni "okudum" onayinin zamani (riza DEGIL, bilgilendirme
+    #: teyidi). Eski kayitlarda NULL.
+    privacy_notice_ack_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+    #: Saglik beyani ("etkileyen durum varsa personele bildiririm") zamani.
+    #: Saglik verisi TUTULMAZ, yalnizca beyanin yapildigi an. Eski kayitlarda NULL.
+    health_declaration_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
     customer: Mapped[Customer] = relationship(foreign_keys=[customer_id])
-    staff: Mapped[Staff] = relationship()
+    staff: Mapped[Staff] = relationship(foreign_keys=[staff_id])
     branch: Mapped[Branch] = relationship()
     items: Mapped[list["AppointmentItem"]] = relationship(
         back_populates="appointment",
@@ -1011,3 +1093,48 @@ class WhatsappContact(Base):
     first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     #: Karsilama mesaji gonderildiyse zamani.
     welcomed_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+
+
+# ---------------------------------------------------------------------
+# WEB PUSH
+# ---------------------------------------------------------------------
+
+
+class PushSubscription(Base):
+    """Bir personelin bir cihazdaki (tarayici/PWA) Web Push aboneligi.
+
+    ``endpoint`` tarayici hizmetinin verdigi benzersiz adrestir; ayni cihaz
+    yeniden abone olursa satir guncellenir (upsert). Tercihler olay turu
+    basina kolondur; yonetici olmayan personel icin ``pref_alerts`` ve
+    ``pref_whatsapp`` hicbir zaman gonderim uretmez.
+    """
+
+    __tablename__ = "push_subscription"
+    __table_args__ = (Index("ix_push_subscription_staff", "staff_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    staff_id: Mapped[int] = mapped_column(ForeignKey("staff.id", ondelete="CASCADE"))
+    endpoint: Mapped[str] = mapped_column(Text, unique=True)
+    p256dh: Mapped[str] = mapped_column(String(200))
+    auth: Mapped[str] = mapped_column(String(100))
+    user_agent: Mapped[str | None] = mapped_column(String(300), default=None)
+    pref_new: Mapped[bool] = mapped_column(Boolean, default=True, server_default=sa_true())
+    pref_cancel: Mapped[bool] = mapped_column(Boolean, default=True, server_default=sa_true())
+    pref_alerts: Mapped[bool] = mapped_column(Boolean, default=True, server_default=sa_true())
+    pref_whatsapp: Mapped[bool] = mapped_column(Boolean, default=True, server_default=sa_true())
+    pref_deposit: Mapped[bool] = mapped_column(Boolean, default=True, server_default=sa_true())
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
+
+    staff: Mapped[Staff] = relationship()
+
+
+class AppState(Base):
+    """Kucuk anahtar-deger deposu (yeniden baslatmalarda korunan durumlar,
+    orn. WhatsApp baglanti durumu / son uyari zamani)."""
+
+    __tablename__ = "app_state"
+
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { serverApi, type MeResponse, type SalonInfo } from '@/lib/server-api';
 import { NavLink } from './nav-link';
 import { SiteHeader } from './site-header';
+import { WhatsAppFab } from './whatsapp-fab';
 
 /**
  * Müşteri arayüzü kabuğu.
@@ -48,15 +49,15 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
       <main className="flex-1">{children}</main>
 
       {/* ================= ALT BİLGİ ================= */}
-      <footer className="mt-20 bg-ink-900 pb-[calc(4.5rem+env(safe-area-inset-bottom))] text-sand-200/80 lg:pb-0">
+      <footer className="mt-20 border-t border-sand-200 bg-gradient-to-b from-sand-100 to-plum-50 pb-[calc(4.5rem+env(safe-area-inset-bottom))] text-ink-500 lg:pb-0">
         <div className="bleed grid gap-10 py-14 sm:grid-cols-2 md:grid-cols-3">
           <div>
-            <p className="display text-2xl text-sand-50">{branch.salon.name}</p>
-            <p className="mt-3 max-w-xs text-sm text-sand-200/70">{branch.address}</p>
+            <p className="display text-2xl text-plum-700">{branch.salon.name}</p>
+            <p className="mt-3 max-w-xs text-sm text-ink-500">{branch.address}</p>
             {branch.salon.phone && (
               <a
                 href={`tel:0${branch.salon.phone}`}
-                className="mt-4 inline-flex text-sm font-medium text-sand-50 hover:text-brass-300"
+                className="mt-4 inline-flex text-sm font-medium text-ink-700 transition-colors hover:text-plum-600"
               >
                 0{branch.salon.phone}
               </a>
@@ -64,11 +65,11 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
           </div>
 
           <nav aria-label="Alt gezinme">
-            <p className="eyebrow !text-brass-300">Sayfalar</p>
+            <p className="eyebrow !text-brass-700">Sayfalar</p>
             <ul className="mt-4 space-y-2.5">
               {links.map((l) => (
                 <li key={l.href}>
-                  <Link href={l.href} className="text-sm text-sand-200/80 transition-colors hover:text-sand-50">
+                  <Link href={l.href} className="text-sm text-ink-500 transition-colors hover:text-plum-600">
                     {l.label}
                   </Link>
                 </li>
@@ -77,36 +78,41 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
           </nav>
 
           <div>
-            <p className="eyebrow !text-brass-300">Randevu</p>
-            <p className="mt-4 text-sm text-sand-200/70">
+            <p className="eyebrow !text-brass-700">Randevu</p>
+            <p className="mt-4 text-sm text-ink-500">
               Uygun saatleri üye olmadan görebilirsin. Randevu için tek adımlık telefon
               doğrulaması yeterli.
             </p>
-            <Link href="/randevu" className="btn-light btn-sm mt-5 inline-flex">
+            <Link href="/randevu" className="btn-secondary btn-sm mt-5 inline-flex">
               Randevu al
             </Link>
           </div>
         </div>
 
-        <div className="border-t border-white/10 py-5">
-          <div className="bleed flex flex-col gap-2 text-xs text-sand-200/60 sm:flex-row sm:items-center sm:justify-between">
+        <div className="border-t border-sand-200 py-5">
+          <div className="bleed flex flex-col gap-2 text-xs text-ink-500 sm:flex-row sm:items-center sm:justify-between">
             <p>
               © {new Date().getFullYear()} {branch.salon.name} · {branch.name}
             </p>
             <nav aria-label="Yasal metinler" className="flex flex-wrap gap-x-4 gap-y-1">
-              <Link href="/kvkk" className="transition-colors hover:text-sand-50">
+              <Link href="/kvkk" className="transition-colors hover:text-plum-600">
                 KVKK Aydınlatma Metni
               </Link>
-              <Link href="/acik-riza" className="transition-colors hover:text-sand-50">
+              <Link href="/acik-riza" className="transition-colors hover:text-plum-600">
                 Açık Rıza Metinleri
               </Link>
-              <Link href="/cerez-politikasi" className="transition-colors hover:text-sand-50">
+              <Link href="/cerez-politikasi" className="transition-colors hover:text-plum-600">
                 Çerez Politikası
               </Link>
             </nav>
           </div>
+          <p className="bleed mt-4 border-t border-sand-200 pt-4 text-center text-xs text-ink-500 sm:text-right">
+            Created by <span className="font-semibold text-plum-600">BecTech</span>
+          </p>
         </div>
       </footer>
+
+      <WhatsAppFab phone={branch.salon.phone} />
 
       {/* Mobil alt gezinme — başparmakla erişilebilir bölge */}
       {/* Ana ekran çubuğu (iPhone) altında kalmasın diye güvenli alan kadar iç boşluk. */}

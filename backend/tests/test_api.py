@@ -183,6 +183,8 @@ def test_full_booking_flow(client, salon):
             "/api/appointments",
             json={
                 "lockId": lock["lockId"],
+                "privacyNoticeAck": True,
+                "healthDeclaration": True,
                 "date": TOMORROW,
                 "staffId": salon["staff_a"].id,
                 "startMin": slot["startMin"],
@@ -246,6 +248,8 @@ def test_booking_the_same_service_twice(client, salon):
             "/api/appointments",
             json={
                 "lockId": lock["lockId"],
+                "privacyNoticeAck": True,
+                "healthDeclaration": True,
                 "date": TOMORROW,
                 "staffId": salon["staff_a"].id,
                 "startMin": slot["startMin"],
@@ -307,6 +311,8 @@ def test_review_requires_completed_appointment(client, salon):
             "/api/appointments",
             json={
                 "lockId": lock["lockId"],
+                "privacyNoticeAck": True,
+                "healthDeclaration": True,
                 **body,
             },
         )

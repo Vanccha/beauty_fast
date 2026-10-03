@@ -1,11 +1,13 @@
 'use client';
 
-import { Check, CircleCheck, Minus, Plus, TriangleAlert, UserPlus, X } from 'lucide-react';
+import { Check, ChevronLeft, CircleCheck, Minus, Plus, TriangleAlert, UserPlus, X } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { NameEditor } from '@/components/auth/NameEditor';
 import { PhoneInput } from '@/components/auth/PhoneInput';
+import { RequiredConsents } from '@/components/booking/ConsentChecks';
+import { DepositNotice, type CustomerDeposit } from '@/components/booking/DepositNotice';
 import { PhoneVerify, type VerifiedCustomer } from '@/components/auth/PhoneVerify';
 import { CategoryIcon } from '@/components/marketing/CategoryIcon';
 import { ApiError, apiSend, durationLabel, formatTl, timeLabel } from '@/lib/api-client';
@@ -66,6 +68,8 @@ interface GroupAvailability {
 
 interface GroupLock {
   groupId: string;
+  /** Kapora önizlemesi: tutar tüm grubun toplamıdır. */
+  deposit?: { enabled: boolean; amount: number | null; policy: string | null };
   expiresAt: string;
   ttlSeconds: number;
   locks: {
@@ -91,6 +95,8 @@ interface CreatedGroup {
     totalPrice: number;
   }[];
   totalPrice: number;
+  /** Kapora bekleniyorsa grup toplamı + ödeme bilgileri */
+  deposit?: CustomerDeposit | null;
 }
 
 type Step = 1 | 2 | 3 | 4;
@@ -182,6 +188,8 @@ export function GroupFlow({
   const [created, setCreated] = useState<CreatedGroup | null>(null);
 
   const [busy, setBusy] = useState(false);
+  const [privacyAck, setPrivacyAck] = useState(false);
+  const [healthDecl, setHealthDecl] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
 
@@ -336,13 +344,15 @@ export function GroupFlow({
   }
 
   async function confirm() {
-    if (!lock) return;
+    if (!lock || !privacyAck || !healthDecl) return;
     setBusy(true);
     setError(null);
     setWarning(null);
     try {
       const result = await apiSend<CreatedGroup>('/api/appointments/group', 'POST', {
         groupId: lock.groupId,
+        privacyNoticeAck: true,
+        healthDeclaration: true,
         people: people.map((p, i) => {
           const l = lock.locks.find((x) => x.personIndex === i);
           return {
@@ -366,7 +376,15 @@ export function GroupFlow({
         setWarning('Seçtiğin saat artık uygun değil. Lütfen yeni bir ortak saat seç.');
         setRefreshTick((t) => t + 1);
       } else {
-        setError(e instanceof ApiError ? e.message : 'Randevular oluşturulamadı.');
+        setError(
+          e instanceof ApiError && e.code === 'PRIVACY_NOTICE_REQUIRED'
+            ? "Devam etmek için KVKK Aydınlatma Metni'ni okuduğunu işaretlemelisin."
+            : e instanceof ApiError && e.code === 'HEALTH_DECLARATION_REQUIRED'
+              ? 'Devam etmek için sağlık beyanını işaretlemelisin.'
+              : e instanceof ApiError
+                ? e.message
+                : 'Randevular oluşturulamadı.',
+        );
       }
     } finally {
       setBusy(false);
@@ -451,9 +469,17 @@ export function GroupFlow({
       <section className="page-shell !max-w-xl space-y-6 py-6">
         <div className="text-center">
           <CircleCheck size={40} strokeWidth={1.5} className="mx-auto text-success-600" aria-hidden />
-          <h1 className="display mt-3 text-3xl md:text-4xl">Grup randevun hazır</h1>
-          <p className="muted mt-2">Diğer kişilere WhatsApp ile bilgi gönderildi.</p>
+          <h1 className="display mt-3 text-3xl md:text-4xl">
+            {created.deposit?.status === 'AWAITING' ? 'Kapora bekleniyor' : 'Grup randevun hazır'}
+          </h1>
+          <p className="muted mt-2">
+            {created.deposit?.status === 'AWAITING'
+              ? 'Grup randevun alındı; toplam kapora ulaşınca kesinleşecek. Diğer kişilere WhatsApp ile bilgi gönderildi.'
+              : 'Diğer kişilere WhatsApp ile bilgi gönderildi.'}
+          </p>
         </div>
+
+        {created.deposit?.status === 'AWAITING' && <DepositNotice deposit={created.deposit} />}
 
         <ul className="space-y-2">
           {created.appointments.map((a) => (
@@ -463,7 +489,7 @@ export function GroupFlow({
                 <p className="muted">
                   {formatDateTr(a.date)} · {timeLabel(a.startMin)}–{timeLabel(a.endMin)}
                 </p>
-                <p className="muted">Usta: {a.staffName}</p>
+                <p className="muted">Personel: {a.staffName}</p>
               </div>
               <span className="font-semibold tabular-nums">{formatTl(a.totalPrice)}</span>
             </li>
@@ -525,6 +551,18 @@ export function GroupFlow({
         </div>
       )}
 
+      {step >= 2 && (
+        <button
+          type="button"
+          onClick={goBack}
+          disabled={busy}
+          className="btn-link -mb-1 inline-flex items-center gap-1 disabled:opacity-50"
+        >
+          <ChevronLeft size={18} strokeWidth={1.75} aria-hidden />
+          Önceki adım
+        </button>
+      )}
+
       {/* ---------- 1) Kişiler ---------- */}
       {step === 1 && (
         <section className="space-y-4">
@@ -532,12 +570,12 @@ export function GroupFlow({
             <p className="eyebrow">Grup randevusu</p>
             <h1 className="display text-3xl md:text-4xl">Kimler geliyor?</h1>
             <p className="muted mt-2">
-              Herkes aynı saatte, ayrı ustalarla başlar. Diğer kişilere WhatsApp ile bilgi gönderilir.
+              Herkes aynı saatte, ayrı personelle başlar. Diğer kişilere WhatsApp ile bilgi gönderilir.
             </p>
           </div>
 
           {/* Kişi sayısı: büyük −/+ ve tek dokunuşla 2·3·4 seçimi */}
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-[4px] border border-plum-600/30 bg-plum-50/60 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-plum-600/30 bg-plum-50/60 p-4">
             <div>
               <p className="eyebrow">Kaç kişi?</p>
               <p className="muted mt-0.5 text-xs">
@@ -666,7 +704,7 @@ export function GroupFlow({
             <button
               type="button"
               onClick={addPerson}
-              className="group flex w-full items-center justify-center gap-3 rounded-[4px] border-2 border-dashed border-plum-600/40 bg-white/60 px-4 py-5 text-plum-600 transition-colors hover:border-plum-600 hover:bg-plum-50"
+              className="group flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-plum-600/40 bg-white/60 px-4 py-5 text-plum-600 transition-colors hover:border-plum-600 hover:bg-plum-50"
             >
               <span className="grid h-10 w-10 place-items-center rounded-full bg-plum-600 text-white transition-transform group-hover:scale-105">
                 <UserPlus size={18} strokeWidth={1.75} aria-hidden />
@@ -679,7 +717,7 @@ export function GroupFlow({
               </span>
             </button>
           ) : (
-            <p className="rounded-[4px] border border-sand-200 px-4 py-3 text-center text-sm text-ink-500">
+            <p className="rounded-2xl border border-sand-200 px-4 py-3 text-center text-sm text-ink-500">
               En fazla {MAX_PEOPLE} kişi ekleyebilirsin. Daha kalabalık gruplar için salonu ara.
             </p>
           )}
@@ -691,7 +729,7 @@ export function GroupFlow({
         <section className="space-y-5">
           <div>
             <h1 className="display text-3xl md:text-4xl">Kim ne yaptıracak?</h1>
-            <p className="muted mt-2">Her kişi için hizmet seç; istersen usta tercihi belirt.</p>
+            <p className="muted mt-2">Her kişi için hizmet seç; istersen personel tercihi belirt.</p>
           </div>
           {people.map((p, i) => (
             <PersonServices
@@ -713,7 +751,7 @@ export function GroupFlow({
         <section className="space-y-4">
           <div>
             <h1 className="display text-3xl md:text-4xl">Ortak saat</h1>
-            <p className="muted mt-2">Hepiniz aynı saatte başlarsınız; her kişiye ayrı usta atanır.</p>
+            <p className="muted mt-2">Hepiniz aynı saatte başlarsınız; her kişiye ayrı personel atanır.</p>
           </div>
 
           <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" role="group" aria-label="Tarih seç">
@@ -725,7 +763,7 @@ export function GroupFlow({
                   type="button"
                   onClick={() => setDate(key)}
                   aria-pressed={date === key}
-                  className={`chip touch-target h-auto shrink-0 flex-col gap-0 px-3 py-2 ${date === key ? 'chip-active' : ''}`}
+                  className={`chip touch-target h-auto shrink-0 flex-col rounded-2xl gap-0 px-3 py-2 ${date === key ? 'chip-active' : ''}`}
                 >
                   <span className="text-[11px] uppercase">{weekday}</span>
                   <span className="font-semibold tabular-nums">{day}</span>
@@ -813,7 +851,7 @@ export function GroupFlow({
                       <p className="font-medium">{personName(p, i)}</p>
                       <p className="muted">{sum.list.map((s) => s.name).join(', ')}</p>
                       <p className="muted">
-                        Usta: {a?.staffName ?? '—'} · {timeLabel(start)}–{timeLabel(end)}
+                        Personel: {a?.staffName ?? '—'} · {timeLabel(start)}–{timeLabel(end)}
                       </p>
                     </div>
                     <span className="font-semibold tabular-nums">
@@ -843,12 +881,33 @@ export function GroupFlow({
               {formatTl(lock.locks.reduce((n, l) => n + l.totalPrice, 0))}
             </span>
           </div>
+
+          {lock.deposit?.enabled && lock.deposit.amount ? (
+            <div className="space-y-1.5 rounded-2xl border border-brass-300 bg-brass-300/15 p-4 text-sm">
+              <p className="font-semibold text-brass-700">Toplam kapora: {formatTl(lock.deposit.amount)}</p>
+              <p className="text-ink-700">
+                Grup randevusu, kapora havalesi ulaşınca kesinleşir. Havale bilgilerini bir sonraki ekranda ve
+                WhatsApp&apos;ta göreceksin.
+              </p>
+              <p className="text-xs text-ink-700">{lock.deposit.policy}</p>
+            </div>
+          ) : null}
+
+          <div className="card">
+            <h2 className="text-base font-semibold text-ink-900">Onaylar</h2>
+            <RequiredConsents
+              privacyAck={privacyAck}
+              onPrivacyAck={setPrivacyAck}
+              healthDecl={healthDecl}
+              onHealthDecl={setHealthDecl}
+            />
+          </div>
         </section>
       )}
 
       {/* ---------- Alt eylem çubuğu ---------- */}
       <div className="sticky bottom-20 z-10 md:bottom-4">
-        <div className="rounded-[4px] border border-sand-200 bg-white p-3">
+        <div className="rounded-2xl border border-sand-200 bg-white p-3">
           <div className="mb-2 flex items-center justify-between text-sm">
             <span className="muted">{people.length} kişi</span>
             <span className="font-semibold tabular-nums">{formatTl(grandPrice)}</span>
@@ -893,10 +952,14 @@ export function GroupFlow({
               <button
                 type="button"
                 className="btn-primary flex-1"
-                disabled={busy || !lock}
+                disabled={busy || !lock || !privacyAck || !healthDecl}
                 onClick={() => void confirm()}
               >
-                {busy ? 'Oluşturuluyor…' : 'Randevuları oluştur'}
+                {busy
+                  ? 'Oluşturuluyor…'
+                  : !privacyAck || !healthDecl
+                    ? 'Onayları işaretle'
+                    : 'Randevuları oluştur'}
               </button>
             )}
           </div>
@@ -1103,8 +1166,8 @@ function PersonServices({
                   type="button"
                   onClick={() => toggle(service.id)}
                   aria-pressed={selected}
-                  className={`w-full rounded-[4px] border p-3 text-left transition-colors ${
-                    selected ? 'border-plum-600 bg-plum-50' : 'border-sand-200 bg-white hover:border-ink-300'
+                  className={`w-full rounded-2xl border p-3 text-left transition-colors ${
+                    selected ? 'border-plum-400 bg-plum-50 ring-1 ring-plum-300' : 'border-sand-200 bg-white hover:border-plum-200 hover:bg-plum-50/40'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -1124,8 +1187,8 @@ function PersonServices({
 
       {person.serviceIds.length > 0 && staff.length > 0 && (
         <div>
-          <p className="label">Usta tercihi</p>
-          <div className="flex flex-wrap gap-2" role="group" aria-label={`${name} için usta tercihi`}>
+          <p className="label">Personel tercihi</p>
+          <div className="flex flex-wrap gap-2" role="group" aria-label={`${name} için personel tercihi`}>
             <button
               type="button"
               aria-pressed={person.staffId === null}
