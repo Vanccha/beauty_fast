@@ -259,6 +259,10 @@ class Staff(Base):
     photo_url: Mapped[str | None] = mapped_column(String(300), default=None)
     display_order: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    #: Instagram kullanici adi ("@" olmadan)
+    instagram: Mapped[str | None] = mapped_column(String(60), default=None)
+    #: Personelin tamamlanan randevu cirosundan payi (0-100)
+    commission_percent: Mapped[float] = mapped_column(Float, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     working_hours: Mapped[list["WorkingHour"]] = relationship(back_populates="staff")

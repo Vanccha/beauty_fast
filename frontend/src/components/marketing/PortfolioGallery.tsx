@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 
-import { CategoryIcon } from '@/components/marketing/CategoryIcon';
-
 export interface PortfolioItem {
   id: number;
   title: string;
@@ -50,26 +48,29 @@ export function PortfolioGallery({
   return (
     <div>
       {usedCategories.length > 0 && (
-        <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 md:mx-0 md:px-0">
-          <button
-            type="button"
-            onClick={() => select(null)}
-            aria-pressed={active === null}
-            className={`chip shrink-0 ${active === null ? 'chip-active' : ''}`}
-          >
-            Hepsi
-          </button>
-          {usedCategories.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => select(c.slug)}
-              aria-pressed={active === c.slug}
-              className={`chip shrink-0 ${active === c.slug ? 'chip-active' : ''}`}
-            >
-              <CategoryIcon slug={c.slug} /> {c.name}
-            </button>
-          ))}
+        <div
+          role="group"
+          aria-label="Kategori"
+          className="flex items-center justify-between gap-2 border-b border-sand-200 md:gap-4"
+        >
+          {[{ id: 0, slug: null as string | null, name: 'Hepsi' }, ...usedCategories].map((c) => {
+            const isActive = active === c.slug;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => select(c.slug)}
+                aria-pressed={isActive}
+                className={`-mb-px flex-1 whitespace-nowrap border-b-2 px-1 py-3 text-center text-xs font-semibold uppercase tracking-[0.14em] transition-colors md:text-sm ${
+                  isActive
+                    ? 'border-brass-500 text-ink-900'
+                    : 'border-transparent text-ink-700 hover:border-brass-500 hover:text-ink-900'
+                }`}
+              >
+                {c.name}
+              </button>
+            );
+          })}
         </div>
       )}
 

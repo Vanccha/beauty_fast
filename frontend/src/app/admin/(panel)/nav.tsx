@@ -11,6 +11,8 @@ import {
   Megaphone,
   Package,
   Star,
+  TrendingUp,
+  UserCog,
   Users,
   Zap,
   type LucideIcon,
@@ -32,6 +34,8 @@ const ICONS: Record<string, LucideIcon> = {
   firsat: Zap,
   portfolyo: Images,
   yorumlar: Star,
+  personel: UserCog,
+  gelir: TrendingUp,
   whatsapp: MessageCircle,
 };
 

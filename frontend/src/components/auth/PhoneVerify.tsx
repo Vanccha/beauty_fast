@@ -44,11 +44,14 @@ export function PhoneVerify({
   title,
   description,
   compact = false,
+  backHref,
 }: {
   onVerified: (customer: VerifiedCustomer) => void;
   title?: string;
   description?: string;
   compact?: boolean;
+  /** Verilirse telefon adımında "Geri dön" bağlantısı gösterilir. */
+  backHref?: string;
 }) {
   const [step, setStep] = useState<'phone' | 'code' | 'name'>('phone');
   const [phone, setPhone] = useState('');
@@ -293,6 +296,13 @@ export function PhoneVerify({
       <button className="btn-primary w-full" disabled={busy || !isValidMobile(normalizePhone(phone))}>
         Kod gönder
       </button>
+
+      {backHref && (
+        <Link href={backHref} className="btn-secondary w-full">
+          <ArrowLeft size={16} strokeWidth={1.5} aria-hidden />
+          Geri dön
+        </Link>
+      )}
 
       <p className="text-xs leading-relaxed text-ink-500">
         Telefon numaran ve adın işlenir; doğrulama kodu WhatsApp ile gönderilir. Ayrıntılar:{' '}

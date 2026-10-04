@@ -99,7 +99,7 @@ export function SiteHeader({
             <span className="hidden xl:inline">Randevu Sorgula</span>
           </Link>
 
-          <Link href="/randevu" className={`btn-sm ${transparent ? 'btn-light' : 'btn-primary'}`}>
+          <Link href="/randevu" className="btn-sm btn-cherry">
             Randevu Al
           </Link>
         </div>

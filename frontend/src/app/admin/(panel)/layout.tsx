@@ -54,10 +54,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/yorumlar', label: 'Yorumlar', desc: 'Müşteri değerlendirmeleri', icon: 'yorumlar' },
     ...(isManager
       ? ([
+          { href: '/admin/personel', label: 'Personeller', desc: 'Ekip, bilgiler ve kazançlar', icon: 'personel' },
           { href: '/admin/whatsapp', label: 'WhatsApp', desc: 'Bağlantı ve mesajlaşma', icon: 'whatsapp' },
         ] as AdminSection[])
       : []),
   ];
+
+  // Gelir raporu YALNIZCA salon sahibine açıktır (yönetici dahil kimse göremez).
+  if (staff.role === 'OWNER') {
+    sections.push({ href: '/admin/gelir', label: 'Gelir Raporu', desc: 'Aylık, geçmiş aylar, yıllık', icon: 'gelir' });
+  }
 
   return (
     <div className="admin-shell min-h-dvh bg-sand-50">

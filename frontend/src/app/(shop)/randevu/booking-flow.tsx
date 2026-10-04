@@ -31,7 +31,6 @@ import {
   isValidMobile,
   normalizePhone as normalizeAnyPhone,
 } from "@/lib/phone";
-import { CategoryIcon } from "@/components/marketing/CategoryIcon";
 import { NameEditor } from "@/components/auth/NameEditor";
 import { PhoneInput } from "@/components/auth/PhoneInput";
 import {
@@ -478,6 +477,26 @@ export function BookingFlow({
         },
       );
       if (seq !== availabilitySeq.current) return;
+
+      // "Farketmez": müşteriye tek bir uzman göster — o gün en çok boş
+      // saati olan (eşitlikte en erken saati olan). Ziyaretçinin bu tarihte
+      // tuttuğu bir saat varsa onun uzmanı da korunur ki kilit görünür kalsın.
+      if (staffId === null && result.staff.length > 1) {
+        const withSlots = result.staff.filter((s) => s.slots.length > 0);
+        if (withSlots.length > 0) {
+          const best = withSlots.reduce((a, b) =>
+            b.slots.length > a.slots.length ||
+            (b.slots.length === a.slots.length &&
+              b.slots[0].startMin < a.slots[0].startMin)
+              ? b
+              : a,
+          );
+          const lockedId = result.yourLock?.staffId;
+          result.staff = result.staff.filter(
+            (s) => s.staffId === best.staffId || s.staffId === lockedId,
+          );
+        }
+      }
       setAvailability(result);
 
       // Seçili saati TAZE veriyle eşle: hâlâ listede ise güncel nesneyi
@@ -1133,15 +1152,15 @@ export function BookingFlow({
 
       {/* ---------- 1) Hizmet seçimi ---------- */}
       {step === 1 && (
-        <section className="space-y-3">
+        <section className="space-y-8">
           <h1 className="display text-3xl md:text-4xl">
             Hangi hizmetleri istiyorsun?
           </h1>
 
           <div>
-            <p className="label">Kimin için?</p>
+            <p className="label mb-2">Kimin için?</p>
             <div
-              className="flex flex-wrap gap-2"
+              className="grid grid-cols-3 gap-1 rounded-2xl bg-sand-100 p-1"
               role="group"
               aria-label="Kimin için?"
             >
@@ -1149,7 +1168,7 @@ export function BookingFlow({
                 type="button"
                 aria-pressed={mode === "self"}
                 onClick={() => setMode("self")}
-                className={`chip ${mode === "self" ? "chip-active" : ""}`}
+                className={`flex min-h-11 items-center justify-center rounded-xl px-2 py-2.5 text-center text-sm leading-tight transition-all duration-200 ${mode === "self" ? 'bg-white font-semibold text-[#5A1428] shadow-sm ring-1 ring-sand-200' : 'font-medium text-ink-500 hover:bg-white/60 hover:text-ink-900'}`}
               >
                 Kendim
               </button>
@@ -1157,7 +1176,7 @@ export function BookingFlow({
                 type="button"
                 aria-pressed={mode === "other"}
                 onClick={() => setMode("other")}
-                className={`chip ${mode === "other" ? "chip-active" : ""}`}
+                className={`flex min-h-11 items-center justify-center rounded-xl px-2 py-2.5 text-center text-sm leading-tight transition-all duration-200 ${mode === "other" ? 'bg-white font-semibold text-[#5A1428] shadow-sm ring-1 ring-sand-200' : 'font-medium text-ink-500 hover:bg-white/60 hover:text-ink-900'}`}
               >
                 Başkası adına
               </button>
@@ -1171,7 +1190,7 @@ export function BookingFlow({
                       : "/randevu/grup",
                   )
                 }
-                className="chip"
+                className={`flex min-h-11 items-center justify-center rounded-xl px-2 py-2.5 text-center text-sm leading-tight transition-all duration-200 font-medium text-ink-500 hover:bg-white/60 hover:text-ink-900`}
               >
                 Grup (2–4 kişi)
               </button>
@@ -1234,17 +1253,25 @@ export function BookingFlow({
             </div>
           )}
 
-          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-            {categories.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setActiveCategory(c.id)}
-                className={`chip shrink-0 ${activeCategory === c.id ? "chip-active" : ""}`}
-              >
-                <CategoryIcon slug={c.slug} /> {c.name}
-              </button>
-            ))}
+          <div>
+            <p className="label mb-2">Almak istediğiniz hizmeti seçin</p>
+            <div
+              className="grid grid-cols-2 gap-1 rounded-2xl bg-sand-100 p-1 sm:grid-cols-4"
+              role="group"
+              aria-label="Hizmet kategorisi"
+            >
+              {categories.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setActiveCategory(c.id)}
+                  aria-pressed={activeCategory === c.id}
+                  className={`flex min-h-11 items-center justify-center rounded-xl px-2 py-2.5 text-center text-sm leading-tight transition-all duration-200 ${activeCategory === c.id ? 'bg-white font-semibold text-[#5A1428] shadow-sm ring-1 ring-sand-200' : 'font-medium text-ink-500 hover:bg-white/60 hover:text-ink-900'}`}
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
           </div>
 
           <ul className="space-y-2">

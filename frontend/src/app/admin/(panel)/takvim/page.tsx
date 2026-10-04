@@ -73,6 +73,7 @@ export default async function CalendarPage({
     adminApi<{ categories: ServiceGroup[] }>('/api/admin/service-options'),
   ]);
   const date = data.date;
+  const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date());
   // Kapora bekleyen / iade bekleyen listeleri yalnızca yönetici ve sahibe gösterilir.
   const isManager = data.viewer.role === 'OWNER' || data.viewer.role === 'MANAGER';
   const depositLists = isManager ? await adminApi<DepositLists>('/api/admin/deposits') : null;
@@ -124,7 +125,17 @@ export default async function CalendarPage({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="eyebrow">{formatDateTr(date)}</p>
+        <div>
+          <p className="display text-2xl leading-tight text-plum-700 md:text-3xl">{formatDateTr(date).split(', ')[1]}</p>
+          <p className="mt-0.5 flex items-center gap-2 text-base font-semibold text-ink-900">
+            {formatDateTr(date).split(', ')[0]}
+            {date === todayKey && (
+              <span className="rounded-full bg-plum-600 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-white">
+                Bugün
+              </span>
+            )}
+          </p>
+        </div>
         <div className="flex items-center gap-1.5">
           <Link href={`/admin/takvim?tarih=${addDaysToKey(date, -1)}`} className="btn-secondary btn-sm">
             <ChevronLeft size={14} strokeWidth={1.5} aria-hidden /> Önceki

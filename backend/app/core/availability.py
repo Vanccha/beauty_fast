@@ -51,6 +51,8 @@ class Diagnostics:
     too_long_for_any_window: bool
     scanned_starts: int = 0
     reason: str | None = None
+    #: Mesai var ama (bugun icin) tum saatler gecmis kaldi mi?
+    time_passed: bool = False
 
 
 @dataclass
@@ -89,7 +91,17 @@ def find_available_slots(data: AvailabilityInput) -> AvailabilityResult:
     # Ustanin hic isi olmadigi (dolayisiyla paketin sigabilecegi) bosluklar.
     from ..intervals import subtract
 
-    staff_free = subtract(work_windows, staff_busy)
+    # Teshis, tarama ile ayni pencereyi gormeli: bugunun gecmis saatleri
+    # (earliest_start_min) bos sayilmaz, yoksa "540 dk bosluk var ama slot
+    # yok" gibi celiskili bir mesaj uretilir.
+    bookable = normalize(
+        [
+            Interval(max(w.start, data.earliest_start_min), w.end)
+            for w in work_windows
+            if w.end > data.earliest_start_min
+        ]
+    )
+    staff_free = subtract(bookable, staff_busy)
     longest_free = int(max((w.end - w.start for w in staff_free), default=0))
 
     required = layout.total_min
@@ -100,6 +112,7 @@ def find_available_slots(data: AvailabilityInput) -> AvailabilityResult:
         if work_windows
         else True,
         scanned_starts=0,
+        time_passed=bool(work_windows) and not bookable,
     )
 
     if required <= 0:

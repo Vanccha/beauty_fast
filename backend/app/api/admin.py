@@ -32,6 +32,9 @@
   GET/PUT /api/admin/settings/discount      - firsat saati sabit indirim ayarlari (yonetici)
   GET/PUT /api/admin/settings/deposit       - kapora ayarlari (yonetici)
   GET    /api/admin/deposits                - kapora bekleyenler + iade bekleyenler (yonetici)
+  GET    /api/admin/reports/revenue         - studyo gelir raporu: aylik/yillik/gecmis aylar (YALNIZ salon sahibi)
+  GET/POST /api/admin/staff                 - personel listesi + kazanc ozeti / personel ekle (yonetici)
+  GET/PATCH/DELETE /api/admin/staff/{id}    - personel kazanc dokumu / duzenle / sil (yonetici)
   POST   /api/admin/appointments/{id}/deposit/paid     - "Kapora odendi" (yonetici)
   POST   /api/admin/appointments/{id}/deposit/refunded - "Kapora iade edildi" (yonetici)
   POST   /api/admin/appointments/{id}/deposit/resend   - kapora mesajini tekrar gonder (yonetici)
@@ -49,7 +52,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, File, Form, Query, UploadFile
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import delete as sa_delete, func, select
 from sqlalchemy.orm import selectinload
 
 from ..config import config
@@ -105,7 +108,7 @@ from ..services.catalog import (
 )
 from ..services.campaign_audience import campaign_match_counts
 from ..services.customer_profile import build_customer_profile, list_customer_summaries
-from ..services import deposit, messaging, post_visit, rebooking, whatsapp_inbound
+from ..services import deposit, messaging, post_visit, rebooking, revenue_report, staff_admin, whatsapp_inbound
 from ..services.notifications import list_notification_queue
 from ..services.portfolio import list_admin_portfolio
 from ..services.reviews import (
@@ -2464,3 +2467,205 @@ def delete_portfolio(staff: StaffDep, db: DbSession, id: int = Query(gt=0)) -> d
     db.commit()
     delete_stored_file(url)
     return {"deleted": 1}
+
+
+# ---------------------------------------------------------------------
+# Personel yonetimi (yonetici / salon sahibi)
+# ---------------------------------------------------------------------
+
+
+def _period(date_from: str | None, date_to: str | None) -> tuple[str, str]:
+    """Varsayilan aralik: icinde bulunulan ayin 1'i -> bugun."""
+    today = to_date_key(now_local())
+    start = date_from or today[:8] + "01"
+    end = date_to or today
+    if not is_date_key(start) or not is_date_key(end) or start > end:
+        raise AppError("VALIDATION", "Tarih aralığı geçersiz.", 400)
+    return start, end
+
+
+@router.get("/staff")
+def list_staff(
+    manager: ManagerDep,
+    db: DbSession,
+    date_from: str | None = Query(default=None, alias="from"),
+    date_to: str | None = Query(default=None, alias="to"),
+) -> dict:
+    branch = get_default_branch(db)
+    start, end = _period(date_from, date_to)
+    rows = db.scalars(
+        select(Staff)
+        .where(Staff.branch_id == branch.id)
+        .order_by(Staff.is_active.desc(), Staff.display_order, Staff.id)
+    ).all()
+    ids = [r.id for r in rows]
+    services = staff_admin.service_ids_by_staff(db, ids)
+    earnings = staff_admin.earnings_summary(db, ids, start, end)
+    items = []
+    for r in rows:
+        e = earnings.get(r.id, {"count": 0, "revenue": 0.0})
+        item = staff_admin.serialize(r, services.get(r.id, []))
+        item["earnings"] = {
+            "count": e["count"],
+            "revenue": e["revenue"],
+            "commission": round(e["revenue"] * (r.commission_percent or 0) / 100, 2),
+        }
+        items.append(item)
+    return {
+        "from": start,
+        "to": end,
+        "viewerRole": manager.role,
+        "viewerId": manager.id,
+        "staff": items,
+        "totals": {
+            "count": sum(i["earnings"]["count"] for i in items),
+            "revenue": sum(i["earnings"]["revenue"] for i in items),
+            "commission": round(sum(i["earnings"]["commission"] for i in items), 2),
+        },
+    }
+
+
+@router.get("/staff/{staff_id}")
+def staff_earnings(
+    staff_id: int,
+    manager: ManagerDep,
+    db: DbSession,
+    date_from: str | None = Query(default=None, alias="from"),
+    date_to: str | None = Query(default=None, alias="to"),
+) -> dict:
+    branch = get_default_branch(db)
+    row = staff_admin.get_staff_or_404(db, branch.id, staff_id)
+    start, end = _period(date_from, date_to)
+    return staff_admin.earnings_detail(db, row, start, end)
+
+
+class StaffCreateBody(BaseModel):
+    name: str = Field(max_length=120)
+    phone: str = Field(max_length=25)
+    password: str = Field(max_length=200)
+    instagram: str | None = Field(default=None, max_length=120)
+    commissionPercent: float = Field(default=0, ge=0, le=100)
+    role: str = "STAFF"
+    serviceIds: list[int] = Field(default_factory=list)
+
+
+@router.post("/staff")
+def create_staff(body: StaffCreateBody, manager: ManagerDep, db: DbSession) -> dict:
+    if body.role not in staff_admin.ROLES:
+        raise AppError("VALIDATION", "Geçersiz rol.", 400, {"field": "role"})
+    if body.role != "STAFF" and manager.role != "OWNER":
+        raise AppError("FORBIDDEN", "Yönetici hesabını yalnızca salon sahibi oluşturabilir.", 403)
+    branch = get_default_branch(db)
+    row = Staff(
+        branch_id=branch.id,
+        name=staff_admin.validate_name(body.name),
+        phone=staff_admin.validate_phone(db, body.phone),
+        password_hash=staff_admin.hash_new_password(body.password),
+        role=body.role,
+        instagram=staff_admin.normalize_instagram(body.instagram),
+        commission_percent=body.commissionPercent,
+        display_order=(db.scalar(select(func.max(Staff.display_order)).where(Staff.branch_id == branch.id)) or 0) + 1,
+    )
+    db.add(row)
+    db.flush()
+    staff_admin.set_services(db, row.id, body.serviceIds, branch.id)
+    staff_admin.create_default_hours(db, row.id, branch.open_minute, branch.close_minute)
+    db.commit()
+    return {"staff": staff_admin.serialize(row, sorted(set(body.serviceIds)))}
+
+
+class StaffPatchBody(BaseModel):
+    name: str | None = Field(default=None, max_length=120)
+    phone: str | None = Field(default=None, max_length=25)
+    #: Dolu ise sifre degisir; bos/None ise dokunulmaz.
+    password: str | None = Field(default=None, max_length=200)
+    instagram: str | None = Field(default=None, max_length=120)
+    commissionPercent: float | None = Field(default=None, ge=0, le=100)
+    role: str | None = None
+    isActive: bool | None = None
+    serviceIds: list[int] | None = None
+
+
+@router.patch("/staff/{staff_id}")
+def update_staff(staff_id: int, body: StaffPatchBody, manager: ManagerDep, db: DbSession) -> dict:
+    branch = get_default_branch(db)
+    row = staff_admin.get_staff_or_404(db, branch.id, staff_id)
+    staff_admin.ensure_can_manage(manager.id, manager.role, row)
+    fields = body.model_fields_set
+    revoke = False
+
+    if "name" in fields and body.name is not None:
+        row.name = staff_admin.validate_name(body.name)
+    if "phone" in fields and body.phone is not None:
+        phone = staff_admin.validate_phone(db, body.phone, exclude_id=row.id)
+        revoke = revoke or phone != row.phone
+        row.phone = phone
+    if body.password:
+        row.password_hash = staff_admin.hash_new_password(body.password)
+        revoke = True
+    if "instagram" in fields:
+        row.instagram = staff_admin.normalize_instagram(body.instagram)
+    if "commissionPercent" in fields and body.commissionPercent is not None:
+        row.commission_percent = body.commissionPercent
+    if "role" in fields and body.role is not None and body.role != row.role:
+        if manager.role != "OWNER":
+            raise AppError("FORBIDDEN", "Rolü yalnızca salon sahibi değiştirebilir.", 403)
+        if row.role == "OWNER" or body.role not in staff_admin.ROLES:
+            raise AppError("VALIDATION", "Salon sahibinin rolü değiştirilemez.", 400, {"field": "role"})
+        row.role = body.role
+        revoke = True
+    if "isActive" in fields and body.isActive is not None and body.isActive != row.is_active:
+        if not body.isActive and (row.role == "OWNER" or row.id == manager.id):
+            raise AppError("VALIDATION", "Salon sahibi ya da kendi hesabınız pasife alınamaz.", 400)
+        row.is_active = body.isActive
+        revoke = revoke or not body.isActive
+    if "serviceIds" in fields and body.serviceIds is not None:
+        staff_admin.set_services(db, row.id, body.serviceIds, branch.id)
+
+    if revoke and row.id != manager.id:
+        staff_admin.revoke_sessions(db, row.id)
+    db.commit()
+    services = staff_admin.service_ids_by_staff(db, [row.id])
+    return {"staff": staff_admin.serialize(row, services.get(row.id, []))}
+
+
+@router.delete("/staff/{staff_id}")
+def delete_staff(staff_id: int, manager: ManagerDep, db: DbSession) -> dict:
+    """Randevu gecmisi yoksa siler; varsa 409 doner (pasife almak onerilir)."""
+    branch = get_default_branch(db)
+    row = staff_admin.get_staff_or_404(db, branch.id, staff_id)
+    staff_admin.ensure_can_manage(manager.id, manager.role, row)
+    if row.role == "OWNER" or row.id == manager.id:
+        raise AppError("VALIDATION", "Salon sahibi ya da kendi hesabınız silinemez.", 400)
+    has_history = db.scalar(select(func.count(Appointment.id)).where(Appointment.staff_id == row.id))
+    if has_history:
+        raise AppError(
+            "HAS_HISTORY",
+            f"{row.name} adına {has_history} randevu kaydı var; silinirse geçmiş kayıtlar da silinir. "
+            "Bunun yerine personeli pasife alın.",
+            409,
+        )
+    # Cocuk satirlari (mesai, hizmet baglari, oturumlar...) veritabani CASCADE'i siler;
+    # ORM ``db.delete`` iliskileri NULL'a cekmeye calisip hata verdigi icin dogrudan DELETE.
+    db.execute(sa_delete(Staff).where(Staff.id == row.id))
+    db.commit()
+    return {"deleted": 1}
+
+
+# ---------------------------------------------------------------------
+# Studyo gelir raporu (yalnizca salon sahibi)
+# ---------------------------------------------------------------------
+
+
+@router.get("/reports/revenue")
+def revenue_report_endpoint(
+    owner: OwnerDep,
+    db: DbSession,
+    year: int | None = Query(default=None, ge=2000, le=2100),
+    month: int | None = Query(default=None, ge=1, le=12),
+) -> dict:
+    """``month`` verilmezse yillik gorunum (12 aylik kirilim); verilirse o ayin
+    ozeti + gunluk kirilim. Gelir = tamamlanan randevu cirosu."""
+    branch = get_default_branch(db)
+    today = to_date_key(now_local())
+    return revenue_report.build_report(db, branch.id, year or int(today[:4]), month)
