@@ -16,6 +16,8 @@
   POST   /api/admin/customers/{id}/note     - gizli usta notu ekle/sil
   POST   /api/admin/customers/{id}/photo    - albume fotograf ekle/sil
   GET    /api/admin/inventory               - stok + kritik uyarilar
+  GET    /api/admin/recipes                 - hizmet sarf receteleri + stok kalemleri
+  PUT    /api/admin/recipes/{service_id}    - bir hizmetin recetesini komple degistir (yonetici)
   GET    /api/admin/campaigns               - kampanyalar
   GET    /api/admin/reminder-rules          - hatirlatma kurallari + onizleme
   GET    /api/admin/notifications           - bildirim kuyrugu (en yakin 25)
@@ -88,6 +90,7 @@ from ..models import (
     ScheduledNotification,
     Service,
     ServiceCategory,
+    ServiceConsumable,
     SlotLock,
     Staff,
     StockMovement,
@@ -1310,6 +1313,116 @@ def patch_inventory(body: InventoryPatchBody, staff: StaffDep, db: DbSession) ->
             "unit": item.unit,
         }
     }
+
+
+# ---------------------------------------------------------------------
+# Sarf recetesi (hizmet -> stok kalemi)
+# ---------------------------------------------------------------------
+
+
+def _recipe_service_row(service: Service, rows: list[ServiceConsumable]) -> dict:
+    return {
+        "id": service.id,
+        "name": service.name,
+        "isActive": service.is_active,
+        "consumables": [
+            {
+                "itemId": r.item_id,
+                "itemName": r.item.name,
+                "unit": r.item.unit,
+                "qtyPerUse": r.qty_per_use,
+            }
+            for r in sorted(rows, key=lambda r: (r.item.name, r.item_id))
+        ],
+    }
+
+
+@router.get("/recipes")
+def recipes(staff: StaffDep, db: DbSession) -> dict:
+    """Hizmet bazli sarf receteleri + secilebilir stok kalemleri."""
+    branch = get_default_branch(db)
+    services = db.scalars(
+        select(Service).where(Service.branch_id == branch.id).order_by(Service.name, Service.id)
+    ).all()
+    items = db.scalars(
+        select(InventoryItem)
+        .where(InventoryItem.branch_id == branch.id)
+        .order_by(InventoryItem.name, InventoryItem.id)
+    ).all()
+    rows = db.scalars(
+        select(ServiceConsumable)
+        .options(selectinload(ServiceConsumable.item))
+        .where(ServiceConsumable.service_id.in_([s.id for s in services]))
+    ).all()
+    by_service: dict[int, list[ServiceConsumable]] = {}
+    for r in rows:
+        by_service.setdefault(r.service_id, []).append(r)
+    return {
+        "services": [_recipe_service_row(s, by_service.get(s.id, [])) for s in services],
+        "items": [{"id": i.id, "name": i.name, "unit": i.unit} for i in items],
+    }
+
+
+class RecipeLineBody(BaseModel):
+    itemId: int = Field(gt=0)
+    qtyPerUse: float = Field(gt=0)
+
+
+class RecipePutBody(BaseModel):
+    consumables: list[RecipeLineBody] = Field(max_length=50)
+
+
+@router.put("/recipes/{service_id}")
+def put_recipe(service_id: int, body: RecipePutBody, manager: ManagerDep, db: DbSession) -> dict:
+    """Hizmetin recetesini tek transaction'da komple degistirir.
+
+    Gecmis stok hareketlerine DOKUNULMAZ; yeni recete yalnizca bundan sonra
+    tamamlanan randevularin dusumunde kullanilir.
+    """
+    branch = get_default_branch(db)
+    service = db.get(Service, service_id)
+    if service is None or service.branch_id != branch.id:
+        raise AppError("NOT_FOUND", "Hizmet bulunamadı.", 404)
+
+    item_ids = [c.itemId for c in body.consumables]
+    if len(set(item_ids)) != len(item_ids):
+        raise AppError("VALIDATION", "Aynı malzeme reçetede birden fazla kez yer alamaz.", 400)
+
+    valid_ids = set(
+        db.scalars(
+            select(InventoryItem.id).where(
+                InventoryItem.branch_id == branch.id, InventoryItem.id.in_(item_ids)
+            )
+        )
+    )
+    if valid_ids != set(item_ids):
+        raise AppError("VALIDATION", "Geçersiz stok kalemi seçildi.", 400)
+
+    existing = {
+        r.item_id: r
+        for r in db.scalars(
+            select(ServiceConsumable)
+            .options(selectinload(ServiceConsumable.item))
+            .where(ServiceConsumable.service_id == service.id)
+        )
+    }
+    wanted = {c.itemId: c.qtyPerUse for c in body.consumables}
+    for item_id, row in existing.items():
+        if item_id not in wanted:
+            db.delete(row)
+        else:
+            row.qty_per_use = wanted[item_id]
+    for item_id, qty in wanted.items():
+        if item_id not in existing:
+            db.add(ServiceConsumable(service_id=service.id, item_id=item_id, qty_per_use=qty))
+    db.commit()
+
+    rows = db.scalars(
+        select(ServiceConsumable)
+        .options(selectinload(ServiceConsumable.item))
+        .where(ServiceConsumable.service_id == service.id)
+    ).all()
+    return {"service": _recipe_service_row(service, list(rows))}
 
 
 # ---------------------------------------------------------------------

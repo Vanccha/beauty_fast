@@ -1,4 +1,5 @@
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, ClipboardList } from 'lucide-react';
+import Link from 'next/link';
 
 import { adminApi } from '@/lib/admin-api';
 import { formatTl } from '@/lib/api-client';
@@ -45,7 +46,13 @@ export default async function StockPage() {
 
   return (
     <div className="space-y-3">
-      <p className="muted tabular-nums">Tahmini stok değeri: {formatTl(totalValue)}</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="muted tabular-nums">Tahmini stok değeri: {formatTl(totalValue)}</p>
+        <Link href="/admin/stok/receteler" className="btn-secondary btn-sm">
+          <ClipboardList size={14} strokeWidth={1.5} aria-hidden />
+          Reçeteler
+        </Link>
+      </div>
 
       {critical.length > 0 && (
         <div className="rounded-[4px] border border-rose-300 px-3 py-2.5">
