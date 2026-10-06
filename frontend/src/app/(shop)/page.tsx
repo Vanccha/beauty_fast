@@ -496,8 +496,7 @@ export default async function HomePage() {
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
           <h2 className="display reveal text-2xl md:text-4xl">İşi yapan eller</h2>
           <p className="muted max-w-xl">
-            Randevu alırken personelini kendin seçebilirsin. Puanlar yalnızca en az üç yorum almış
-            personel için gösterilir.
+            Randevu alırken personelini kendin seçebilirsin.
           </p>
         </div>
 

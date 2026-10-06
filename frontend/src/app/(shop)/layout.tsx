@@ -106,8 +106,15 @@ export default async function ShopLayout({ children }: { children: React.ReactNo
               </Link>
             </nav>
           </div>
-          <p className="bleed mt-4 border-t border-sand-200 pt-4 text-center text-xs text-ink-500 sm:text-right">
-            Created by <span className="font-semibold text-plum-600">BecTech</span>
+          <p className="bleed mt-4 border-t border-sand-200 pt-4 text-center text-xs text-ink-500">
+            Created by <a
+              href="https://www.linkedin.com/company/behtechlabs/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-plum-600 transition-colors hover:text-plum-700 hover:underline"
+            >
+              BehTech
+            </a>
           </p>
         </div>
       </footer>

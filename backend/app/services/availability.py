@@ -459,6 +459,8 @@ def _explain_empty(slot_count: int, diagnostics, work_window_count: int) -> str 
         return None
     if work_window_count == 0:
         return "Bu tarihte çalışmıyor."
+    if diagnostics.time_passed:
+        return "Bugün için randevu saati kalmadı. Lütfen başka bir gün seçin."
     if diagnostics.too_long_for_any_window:
         return f"{diagnostics.required_min} dakikalık paket, mesai penceresine hiç sığmıyor."
     return (
@@ -472,6 +474,11 @@ def _summarize_empty(staff_results: Sequence[dict], required_min: int) -> str:
     kullaniciya gorunen yuzu: neden slot olmadigini acikca soyler."""
     if not staff_results:
         return "Seçtiğiniz hizmetlerin tamamını yapabilen personel bulunamadı."
+    if all(
+        "bugün için randevu saati kalmadı" in (s["diagnostics"]["reason"] or "").lower()
+        for s in staff_results
+    ):
+        return "Bugün için randevu saati kalmadı. Lütfen başka bir gün seçin."
     longest = max([0] + [s["diagnostics"]["longestFreeWindowMin"] for s in staff_results])
     if 0 < longest < required_min:
         return (

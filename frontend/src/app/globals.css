@@ -123,6 +123,7 @@ body::before {
   .btn-primary,
   .btn-secondary,
   .btn-ghost,
+  .btn-cherry,
   .btn-light,
   .btn-outline-light,
   .btn-danger {
@@ -164,6 +165,17 @@ body::before {
 
   .btn-primary {
     @apply border-plum-600 bg-plum-600 text-white shadow-sm shadow-plum-900/10 hover:border-plum-700 hover:bg-plum-700;
+  }
+
+  /* Vişne çürüğü: üst çubuktaki "Randevu Al" */
+  .btn-cherry {
+    @apply border-transparent text-white shadow-sm;
+    background-color: #5a1428;
+    border-color: #5a1428;
+  }
+  .btn-cherry:hover {
+    background-color: #430e1d;
+    border-color: #430e1d;
   }
 
   .btn-secondary {
@@ -246,6 +258,19 @@ body::before {
   }
   textarea.field {
     @apply py-3;
+  }
+  /* Dosya seçici: "Dosya seç" düğmesi ve "Dosya seçilmedi" metni kutuda dikey ortalı. */
+  input[type='file'].field {
+    @apply flex items-center py-0 text-sm text-ink-500;
+    padding-inline: 0.5rem;
+    line-height: calc(3rem - 2px);
+    cursor: pointer;
+  }
+  input[type='file'].field::file-selector-button {
+    @apply mr-3 cursor-pointer rounded-lg border-0 bg-sand-100 px-3 text-xs font-semibold uppercase text-ink-700;
+    letter-spacing: 0.08em;
+    height: 2.25rem;
+    vertical-align: middle;
   }
   .field:focus {
     outline: 1px solid var(--color-ink-900);

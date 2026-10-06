@@ -457,6 +457,7 @@ export function GroupFlow({
       <div className="page-shell py-6">
         <PhoneVerify
           onVerified={setCustomer}
+          backHref="/randevu"
           title="Grup randevusu"
           description="Grubu oluşturmak için önce kendi numaranı doğrula. Diğer kişilere WhatsApp ile bilgi gönderilir."
         />
